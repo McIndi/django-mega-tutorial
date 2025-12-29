@@ -1,0 +1,6 @@
+.env
+.venv/
+notes.ipynb
+__pycache__/
+*.pyc
+tree.py
