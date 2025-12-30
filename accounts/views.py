@@ -8,7 +8,7 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from .forms import CustomUserCreationForm, CustomAuthenticationForm, CustomPasswordResetForm
+from .forms import CustomUserCreationForm, CustomAuthenticationForm, CustomPasswordResetForm, CustomSetPasswordForm
 from .models import CustomUser
 
 
@@ -49,7 +49,7 @@ class CustomPasswordResetDoneView(PasswordResetDoneView):
 
 
 class CustomPasswordResetConfirmView(PasswordResetConfirmView):
-    form_class = SetPasswordForm
+    form_class = CustomSetPasswordForm
     template_name = 'accounts/password_reset_confirm.html'
     success_url = reverse_lazy('password_reset_complete')
 
