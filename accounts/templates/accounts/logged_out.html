@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logged Out</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .btn { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #0056b3; }
+        .messages { margin-bottom: 20px; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h2>You have been logged out</h2>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{% if message.tags %}{{ message.tags }}{% endif %}">{{ message }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <p>Thank you for using our application.</p>
+    <a href="{% url 'login' %}" class="btn">Login again</a>
+</body>
+</html>

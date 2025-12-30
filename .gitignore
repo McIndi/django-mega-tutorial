@@ -4,3 +4,5 @@ notes.ipynb
 __pycache__/
 *.pyc
 tree.py
+db.sqlite3
+.DS_Store
