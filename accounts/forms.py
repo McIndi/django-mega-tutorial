@@ -20,6 +20,13 @@ class CustomUserCreationForm(UserCreationForm):
         self.fields['password1'].help_text = "Your password must contain at least 8 characters."
         self.fields['password2'].help_text = "Enter the same password as above."
 
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']
+        if commit:
+            user.save()
+        return user
+
 
 class CustomAuthenticationForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
