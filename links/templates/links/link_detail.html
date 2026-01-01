@@ -1,0 +1,116 @@
+{% extends "core/base.html" %}
+{% block title %}Link Details{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4">{{ link.slug }}</h1>
+        <p class="mb-0 text-muted">Created {{ link.created_at|date:"M d, Y" }}</p>
+    </div>
+    <div>
+        <a class="btn btn-outline-primary" href="{% url 'link_update' link.pk %}">Edit</a>
+        <a class="btn btn-outline-danger" href="{% url 'link_delete' link.pk %}">Delete</a>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h5">Short URL</h2>
+        <div class="input-group">
+            <input type="text" class="form-control font-monospace" value="{{ full_url }}" readonly id="short-url">
+            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard()">
+                <span id="copy-icon">📋 Copy</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h5">Target URL</h2>
+        <p class="mb-0"><a href="{{ link.target_url }}" target="_blank" rel="noopener">{{ link.target_url }}</a></p>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h5">Click Statistics</h2>
+        <p class="h3 mb-3">{{ total_clicks }} <small class="text-muted">total clicks</small></p>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <h3 class="h6">Top Referrers</h3>
+                {% if top_referrers %}
+                <ul class="list-unstyled">
+                    {% for stat in top_referrers %}
+                    <li class="mb-1">
+                        <span class="badge bg-secondary">{{ stat.count }}</span>
+                        <small class="text-truncate d-inline-block" style="max-width: 300px;">{{ stat.referrer }}</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0">No referrer data yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <h3 class="h6">Top User Agents</h3>
+                {% if top_user_agents %}
+                <ul class="list-unstyled">
+                    {% for stat in top_user_agents %}
+                    <li class="mb-1">
+                        <span class="badge bg-secondary">{{ stat.count }}</span>
+                        <small class="text-truncate d-inline-block" style="max-width: 300px;">{{ stat.user_agent|truncatechars:50 }}</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0">No user agent data yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if recent_clicks %}
+        <h3 class="h6 mt-3">Recent Clicks</h3>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Referrer</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for click in recent_clicks %}
+                    <tr>
+                        <td><small>{{ click.created_at|date:"M d, H:i" }}</small></td>
+                        <td><small class="text-truncate d-inline-block" style="max-width: 200px;">{{ click.referrer|default:"Direct" }}</small></td>
+                        <td><small>{{ click.ip_address|default:"-" }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyToClipboard() {
+    const input = document.getElementById('short-url');
+    const icon = document.getElementById('copy-icon');
+    input.select();
+    input.setSelectionRange(0, 99999); // For mobile
+    navigator.clipboard.writeText(input.value);
+
+    // Visual feedback
+    icon.textContent = '✅ Copied!';
+    setTimeout(() => {
+        icon.textContent = '📋 Copy';
+    }, 2000);
+}
+</script>
+{% endblock %}
