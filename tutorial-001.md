@@ -1,152 +1,179 @@
-# Building a Django SaaS App Template: From Scratch to Subscription-Ready
+# Building a Django SaaS App Template
+Or The Django SaaS Mega-Tutorial
 
-**Published on December 30, 2025**  
-*By Cliff*  
+## From Scratch to Subscription-Ready (Part 1)
+
+**Published December 30, 2025**
+*By Cliff*
+
+---
 
 ## TL;DR
 
-A short, practical guide to scaffolding a Django-based SaaS starter app with email-based authentication, Bootstrap UI, and environment-based settings. Follow the steps to create the project, add a custom user model, wire up authentication views and templates, and prepare for local testing. Production deployment and hardening will be covered in Tutorial 3.
+This tutorial walks through building a **clean, production-minded Django SaaS starter** from scratch. You’ll set up environment-based settings, implement an email-first custom user model, wire authentication flows, and build a responsive Bootstrap UI. By the end, you’ll have a runnable local application suitable for free-tier users and ready to evolve into a paid SaaS.
+
+Production deployment and subscription billing are intentionally deferred to later tutorials.
+
+---
+
+## Who This Is For
+
+This guide is written for:
+
+* **Solo founders** who want a solid SaaS starting point
+* **Developers** who want fewer shortcuts and more correctness
+* **Technical leaders** evaluating Django as a SaaS platform
+
+You don’t need deep Django expertise, but you should be comfortable reading Python and using the command line.
+
+---
 
 ## Prerequisites
 
-- Python 3.10 or newer
-- Basic familiarity with the command line and Git
-- Estimated time: 30–90 minutes (depending on familiarity)
+* Python 3.10 or newer
+* Basic familiarity with Git and virtual environments
+* Estimated time: **30–90 minutes**
+
+---
 
 ## Table of Contents
 
-- [Step 1: Environment Setup and Project Initialization](#step-1-environment-setup-and-project-initialization)
-- [Step 2: Custom User Model for Email-Based Authentication](#step-2-custom-user-model-for-email-based-authentication)
-- [Step 3: Authentication Views, Forms, and Templates](#step-3-authentication-views-forms-and-templates)
-- [Step 4: Core App and Responsive UI](#step-4-core-app-and-responsive-ui)
-- [Navbar & Navigation](#navbar--navigation)
-- [Step 5: Testing, Running, and Deployment Prep](#step-5-testing-running-and-deployment-prep)
-- [Visual Overview: Project Structure and Flows](#visual-overview-project-structure-and-flows)
-- [Quick Commands Cheat Sheet](#quick-commands-cheat-sheet)
-- [Frontend details: forms, theme toggle, and color fixes](#frontend-details-forms-theme-toggle-and-color-fixes)
-- [Technical accuracy & production notes](#technical-accuracy--production-notes)
+* Environment setup and project initialization
+* Email-based custom user model
+* Authentication views, forms, and templates
+* Core app and shared UI
+* Testing and local verification
+* Project structure and flow diagrams
+* Production notes and gotchas
 
-## One-page Quick Reference
+---
 
-Use this page as a compact cheat-sheet for the most common tasks and file locations.
+## One-Page Quick Reference
 
-- Key commands
+### Key Commands
 
 ```bash
-# Create & activate venv (Windows)
+# Create and activate a virtual environment (Windows)
 python -m venv .venv
 .venv\Scripts\activate
 
-# Install deps
+# macOS / Linux
+source .venv/bin/activate
+
+# Install dependencies
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
-# Create project and app
+# Create project and apps
 django-admin startproject config .
 python manage.py startapp accounts
 
-# Migrations, superuser, run
+# Migrations and local run
 python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
 
-- Key files and where to edit them
+### Key Files
 
-- `config/settings.py`: environment loading, `AUTH_USER_MODEL`, security settings
-- `accounts/models.py`: custom user model
-- `accounts/forms.py`: form widgets and Bootstrap classes
-- `accounts/urls.py` and `accounts/views.py`: authentication flows
-- `core/templates/core/base.html`: shared layout, navbar, theme toggle
+* `config/settings.py` — environment loading, security, auth model
+* `accounts/models.py` — custom user model
+* `accounts/forms.py` — Bootstrap-styled auth forms
+* `accounts/views.py` — registration and login flows
+* `core/templates/core/base.html` — shared layout and navigation
 
-- Quick troubleshooting
+---
 
-- Missing SECRET_KEY or env values: ensure `.env` exists and `env.read_env()` points to it.
-- Migrations fail after changing `AUTH_USER_MODEL`: revert changes or recreate migrations carefully; prefer setting `AUTH_USER_MODEL` before the first migrations.
-- Templates not found: verify `TEMPLATES['DIRS']` and that your templates are in `templates/<app>/` or app-level `templates/` folders and that `APP_DIRS` is True.
-- Static files look wrong in production: run `python manage.py collectstatic` and confirm `STATIC_ROOT` + whitenoise/Nginx config (deployment details covered in Tutorial 3).
+## Why Django for SaaS?
 
+Django’s strength is not that it’s “simple,” but that it’s **complete**.
 
-## Introduction: Why Django for SaaS Apps?
+Authentication, admin tooling, ORM, migrations, and security primitives are all first-class. For SaaS products, this matters more than novelty. You want predictable behavior, strong defaults, and a framework that scales with complexity rather than fighting it.
 
-In the world of web development, building a Software as a Service (SaaS) application requires a framework that handles user authentication, scalability, and rapid prototyping. Django, a high-level Python web framework, excels here due to its "batteries included" philosophy—meaning it comes with built-in tools for databases, admin interfaces, authentication, and more. This reduces boilerplate code and lets you focus on your app's unique features.
+This tutorial reflects that philosophy. We avoid shortcuts that feel convenient early but cause friction later, especially around authentication, settings, and structure.
 
-This tutorial guides you through creating a "Django Mega Tutorial" app template. It's designed for modern SaaS platforms, like social media sites where users sign up for free initially. We'll emphasize best practices: security, modularity, and extensibility. By the end, you'll have a deployable app ready for free-tier users. And yes, we'll touch on future enhancements like integrating with Stripe for paid subscriptions to show how this scales into a monetized product.
-
-**Why this approach?** Many tutorials start simple but leave out production concerns. Here, we prioritize security (environment variables), user experience (responsive UI), and growth (custom models). This isn't a toy example but a foundation for real apps.
+---
 
 ## Step 1: Environment Setup and Project Initialization
 
-What you'll do in this step:
+### Goals
 
-- Create and activate a virtual environment
-- Install core dependencies
-- Create the Django project scaffold and basic settings
+In this step, you will:
 
+* Create an isolated Python environment
+* Install minimal dependencies
+* Initialize a Django project with environment-based settings
 
-### Installing Python and Virtual Environments
+### Virtual Environment
 
-First, ensure you have Python installed. Download the latest version from [python.org](https://www.python.org/downloads/). We recommend Python 3.10+ for its stability and Django compatibility.
-
-**Reasoning:** Using a virtual environment isolates dependencies, preventing conflicts with system Python. This is a Django best practice to avoid "works on my machine" issues.
-
-Create and activate a virtual environment:
+Always start with isolation. It prevents dependency conflicts and makes builds reproducible.
 
 ```bash
 python -m venv .venv
-# On Windows:
+```
+
+Activate it:
+
+```bash
+# Windows
 .venv\Scripts\activate
-# On macOS/Linux:
+
+# macOS / Linux
 source .venv/bin/activate
 ```
 
-### Dependencies and Requirements
+---
 
-Create `requirements.txt` in the project root:
+### Dependencies
+
+Create a `requirements.txt` file:
 
 ```
 django
 django-environ
 ```
 
-Install them:
+Install:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-**Reasoning:** `django-environ` manages sensitive settings via environment variables, avoiding hardcoding secrets. We start minimal—add more libraries (e.g., Stripe) as needed to keep the tutorial focused.
+**Why these?**
 
-### Creating the Django Project
+* `django` — the framework
+* `django-environ` — structured, explicit environment management
 
-Run:
+We keep dependencies minimal on purpose.
+
+---
+
+### Create the Project
 
 ```bash
 django-admin startproject config .
 ```
 
-This creates `manage.py` and the `config/` directory with core files such as `settings.py` and `urls.py`.
+Using `config` as the project name keeps the structure clean and avoids semantic confusion later when adding domain-specific apps.
 
-**Reasoning:** Naming the project `config` (instead of the default app name) creates a cleaner structure. The `.` places files in the root, making it easier to manage with tools like Docker or deployment scripts.
+---
 
 ### Environment-Based Settings
 
-Edit `config/settings.py`. Add at the top:
+Edit `config/settings.py`:
 
 ```python
 from pathlib import Path
 import environ
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Initialize environment variables
 env = environ.Env()
 env.read_env(BASE_DIR / '.env')
 ```
 
-Update settings to use env vars:
+Replace hardcoded values:
 
 ```python
 SECRET_KEY = env('DJANGO_SECRET_KEY')
@@ -154,48 +181,41 @@ DEBUG = env.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=[])
 ```
 
-Create `.env` (and `.env.example` for sharing):
+Create `.env`:
 
 ```dotenv
-DJANGO_SECRET_KEY=your-super-secret-key-here-generate-a-new-one
+DJANGO_SECRET_KEY=replace-me-with-a-real-secret
 DJANGO_DEBUG=True
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 ```
 
-**Reasoning:** Hardcoding secrets is a security risk. Environment variables keep them out of version control. `django-environ` simplifies this. The `.env.example` acts as documentation for collaborators.
+**Why this matters**
 
-Set `DJANGO_SETTINGS_MODULE` and check (on Windows use `set` or PowerShell `setx` as appropriate):
+Hardcoded secrets leak. Environment variables scale cleanly from local dev to CI to production. `.env.example` doubles as documentation for collaborators and automation.
+
+Validate early:
 
 ```bash
-# Unix / macOS (example)
-export DJANGO_SETTINGS_MODULE=config.settings
-python manage.py check
-
-# On Windows (cmd.exe)
-set DJANGO_SETTINGS_MODULE=config.settings
 python manage.py check
 ```
 
-**Reasoning:** This validates configuration early, catching issues before adding complexity.
+---
 
-## Step 2: Custom User Model for Email-Based Authentication
+## Step 2: Custom User Model (Email-First)
 
-Django's default user model uses username, but email is more user-friendly for SaaS apps.
+Email-based authentication is the norm for SaaS. Django allows this cleanly, but **only if you do it early**.
 
-What you'll do in this step:
-
-- Create the `accounts` app
-- Define a custom user model using email as the `USERNAME_FIELD`
-- Wire the custom user model into `AUTH_USER_MODEL` in settings
-
-
-Create the `accounts` app:
+### Create the Accounts App
 
 ```bash
 python manage.py startapp accounts
 ```
 
-In `accounts/models.py`, define the custom model:
+---
+
+### Custom User Model
+
+`accounts/models.py`:
 
 ```python
 from django.db import models
@@ -204,7 +224,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 class CustomUserManager(BaseUserManager):
     def create_user(self, username, email, password=None):
         if not email:
-            raise ValueError("Users must have an email address")
+            raise ValueError("Email is required")
         email = self.normalize_email(email)
         user = self.model(username=username, email=email)
         user.set_password(password)
@@ -222,6 +242,7 @@ class CustomUser(AbstractBaseUser):
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)
     date_joined = models.DateTimeField(auto_now_add=True)
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
@@ -235,22 +256,15 @@ class CustomUser(AbstractBaseUser):
         return self.email
 ```
 
-Update `config/settings.py`:
+Register it in `config/settings.py`:
 
 ```python
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'accounts',
-]
+INSTALLED_APPS += ['accounts']
 AUTH_USER_MODEL = 'accounts.CustomUser'
 ```
 
-Important: set `AUTH_USER_MODEL` in `config/settings.py` before creating your project's initial migrations. Changing the `AUTH_USER_MODEL` later is possible but requires careful manual migration work and can be error-prone.
+> ⚠️ **Important**
+> `AUTH_USER_MODEL` must be set **before** initial migrations. Changing it later is painful and error-prone.
 
 Run migrations:
 
@@ -259,394 +273,459 @@ python manage.py makemigrations accounts
 python manage.py migrate
 ```
 
-**Reasoning:** Custom user models allow flexibility (e.g., email login). We extend `AbstractBaseUser` for control. Migrations ensure the database schema matches. This is crucial for SaaS, where user data is central.
+---
 
 ## Step 3: Authentication Views, Forms, and Templates
 
+This step wires user registration, login, logout, and profile views.
+
 ### Forms with Bootstrap Styling
 
-In `accounts/forms.py`, create forms for registration, login, and password reset. Use Bootstrap classes for responsive design.
-
-What you'll do in this step:
-
-- Create form classes and widget attributes for Bootstrap styling
-- Add views for registration, login, logout, and profile
-- Add templates that extend the shared `base.html`
-
-
-**Reasoning:** Bootstrap ensures mobile-friendly UI without custom CSS. Custom forms integrate with our user model.
-
-### Views for User Flows
-
-In `accounts/views.py`, implement class-based views for registration and function-based for login/logout/profile. Use Django's built-in password reset views.
-
-**Reasoning:** Class-based views reduce code duplication. Function views for simplicity where needed. Messages provide user feedback.
-
-### URLs and Templates
-
-In `accounts/urls.py`, map URLs to views. Create templates in `accounts/templates/accounts/` for each page, extending a base template.
-
-**Reasoning:** Organized URLs prevent conflicts. Templates separate logic from presentation, following Django's MTV pattern.
-
-### Frontend details: forms, theme toggle, and color fixes
-
-Short frontend guidance so readers won't be surprised by Bootstrap + dark/light theme issues.
-
-- Forms: in `accounts/forms.py` prefer adding only layout classes (e.g., `form-control`) to widgets rather than background color utilities. Example:
+`accounts/forms.py`:
 
 ```python
 from django import forms
+from .models import CustomUser
 
 class RegisterForm(forms.ModelForm):
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control'})
+    )
+
     class Meta:
         model = CustomUser
         fields = ['username', 'email', 'password']
         widgets = {
-                'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'}),
-                'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email'}),
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
         }
 ```
 
-- Theme toggle: store the choice in `localStorage` and toggle a `dark` class on the document element. Keep the JS minimal and place it near the end of `base.html`:
+**Guideline:**
+Add layout classes only. Avoid hardcoded colors that will clash with theming later.
 
-```html
-<script>
-    const toggle = document.getElementById('theme-toggle');
-    toggle && toggle.addEventListener('click', () => {
-        document.documentElement.classList.toggle('dark');
-        localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    });
-</script>
-```
+---
 
-- Color fixes: if some colors look off in dark or light mode, the usual fix is to remove utility classes like `bg-primary` or `bg-secondary` from components — those color utilities can clash with either or both themes. Prefer neutral utilities (`bg-light` / `bg-dark`) or, better, use CSS variables for colors and override Bootstrap variables so your theme switches cleanly.
+### Views and URLs
 
-- Testing: test key pages (login, register, profile) in both themes and on mobile widths to ensure spacing and contrast remain good.
+Use Django’s built-in auth views where possible. They are secure, tested, and boring in the best way.
 
-## Step 4: Core App and Responsive UI
+* Class-based views for registration
+* Built-ins for login/logout/reset
+* Function views only when simplicity wins
 
-Create the `core` app for the homepage:
+Templates live under `accounts/templates/accounts/` and extend a shared base.
 
-What you'll do in this step:
+---
 
-- Create the `core` app and index view
-- Create a shared `base.html` with navigation and theme toggle
-- Add simple pages that extend `base.html`
+## Step 4: Core App and Shared UI
 
+Create a `core` app for non-auth pages:
 
 ```bash
 python manage.py startapp core
 ```
 
-Add it to `INSTALLED_APPS`. Create a simple index view and template.
+This app owns:
 
-For the base template (`core/templates/core/base.html`), use Bootstrap 5 with a navbar, theme toggle, and content blocks. Include JavaScript for dark/light mode.
+* The homepage
+* Shared layout (`base.html`)
+* Navigation and theme toggle
 
-**Reasoning:** A shared base reduces duplication. Bootstrap + theme toggle improves UX. JavaScript is minimal and client-side for performance.
+### Base Template
 
-Update `config/urls.py` to include app URLs.
+Use Bootstrap 5 and a single shared navbar. Authentication state controls visible links. Logout is a POST form to avoid side effects from browser caching and to follow HTTP conventions (state-changing operations should use POST, not GET).
 
-### Navbar & Navigation
-
-A shared navbar in `core/templates/core/base.html` improves site navigation and UX. Use Bootstrap 5's responsive navbar and Django template conditionals to show links based on authentication state.
-
-Key points:
-- Use `{% load static %}` and include Bootstrap (CDN or local) in the head.
-- Ensure the auth context processor is enabled (it's included by default in Django's `TEMPLATES` setting) so `user` is available in templates.
-- Use a POST form for logout to avoid side effects from a GET request.
-
-Example `base.html` navbar (Bootstrap 5):
+Theme toggling is client-side and minimal:
 
 ```html
-{% load static %}
-<!doctype html>
+<script>
+    const toggle = document.getElementById('theme-toggle');
+    toggle?.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.theme =
+            document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    });
+</script>
+```
+
+---
+
+## Deep Dive: Shared Base Template and Authentication Pages
+
+At this point in the tutorial, we’ve referenced a shared base template and several authentication pages without looking at them in detail. This section fills that gap.
+
+These templates are intentionally simple, explicit, and boring. That’s a feature, not a bug. SaaS applications benefit from predictability and clarity, especially around authentication flows.
+
+---
+
+## The Shared Base Template (`core/base.html`)
+
+This file defines the global layout, navigation, Bootstrap inclusion, and light/dark theme toggle. Every page in the app extends it.
+
+### Full Listing: `core/templates/core/base.html`
+
+```html
+<!DOCTYPE html>
 <html lang="en">
-    <head>
-        <!-- Bootstrap CSS via CDN (or use static files) -->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head>
-    <body>
-        <nav class="navbar navbar-expand-lg navbar-light bg-light">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="{% url 'index' %}">MyApp</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                        <li class="nav-item"><a class="nav-link" href="{% url 'index' %}">Home</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">About</a></li>
-                    </ul>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}My SaaS App{% endblock %}</title>
 
-                    <ul class="navbar-nav">
-                        {% if user.is_authenticated %}
-                            <li class="nav-item"><a class="nav-link" href="{% url 'profile' %}">Profile</a></li>
-                            <li class="nav-item">
-                                <form method="post" action="{% url 'logout' %}" class="d-inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-link nav-link" style="display:inline;">Logout</button>
-                                </form>
-                            </li>
-                        {% else %}
-                            <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Login</a></li>
-                            <li class="nav-item"><a class="nav-link" href="{% url 'register' %}">Register</a></li>
-                        {% endif %}
-                    </ul>
-                </div>
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+        crossorigin="anonymous"
+    >
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg bg-light navbar-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'index' %}">My SaaS App</a>
+
+            <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarNav"
+                aria-controls="navbarNav"
+                aria-expanded="false"
+                aria-label="Toggle navigation"
+            >
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'index' %}">Home</a>
+                    </li>
+
+                    {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'profile' %}">Profile</a>
+                    </li>
+                    {% endif %}
+                </ul>
+
+                <ul class="navbar-nav">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link nav-link" style="border: none; padding: 0; background: none; cursor: pointer;">Logout</button>
+                            </form>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">Login</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'register' %}">Register</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="nav-item">
+                        <button
+                            id="theme-toggle"
+                            class="btn btn-link nav-link"
+                            type="button"
+                        >
+                            🌙
+                        </button>
+                    </li>
+                </ul>
             </div>
-        </nav>
+        </div>
+    </nav>
 
+    <div class="container mt-4">
         {% block content %}{% endblock %}
+    </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    </body>
+    <script
+        src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"
+    ></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const themeToggle = document.getElementById('theme-toggle');
+            const html = document.documentElement;
+            const navbar = document.querySelector('.navbar');
+
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            html.setAttribute('data-bs-theme', currentTheme);
+            updateNavbar();
+            updateIcon();
+
+            themeToggle.addEventListener('click', () => {
+                const newTheme =
+                    html.getAttribute('data-bs-theme') === 'dark'
+                        ? 'light'
+                        : 'dark';
+
+                html.setAttribute('data-bs-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                updateNavbar();
+                updateIcon();
+            });
+
+            function updateNavbar() {
+                const isDark = html.getAttribute('data-bs-theme') === 'dark';
+                navbar.classList.toggle('bg-light', !isDark);
+                navbar.classList.toggle('bg-dark', isDark);
+                navbar.classList.toggle('navbar-light', !isDark);
+                navbar.classList.toggle('navbar-dark', isDark);
+            }
+
+            function updateIcon() {
+                const isDark = html.getAttribute('data-bs-theme') === 'dark';
+                themeToggle.innerHTML = isDark ? '☀️' : '🌙';
+            }
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
 </html>
 ```
 
-Notes:
-- Adjust link names to match your URL names (e.g., `'index'`, `'profile'`, `'register'`).
-- Styling: prefer neutral background utilities or CSS variables; avoid `bg-primary`/`bg-secondary` for large surfaces since they often don't switch well across light/dark themes.
+### Why This Template Works Well
 
-## Step 5: Testing, Running, and Deployment Prep
+A few intentional choices worth calling out:
 
-Create a superuser for admin access:
+* **Single responsibility**: layout, navigation, and theme only
+* **No inline business logic**: only auth-aware conditionals
+* **Client-side theme toggle**: no database writes, no sessions
+* **Bootstrap via CDN**: simple for tutorials, easy to replace later
 
-What you'll do in this step:
+This template is stable enough to survive early SaaS growth without becoming a dumping ground for unrelated concerns.
 
-- Create a superuser for admin access
-- Run the development server and test flows locally
-- Prepare basic production notes (logging, static files)
- - Prepare basic production notes (logging, static files) — production hardening is out of scope for this tutorial
+---
 
+## Authentication Template Example: Login Page
+
+The login template demonstrates a reusable pattern you’ll see across all auth-related pages: centered card layout, form iteration, and consistent error handling.
+
+### Full Listing: `accounts/login.html`
+
+```html
+{% extends 'core/base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center">Login</h2>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    {% for field in form %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+
+                            {% if field.help_text %}
+                                <div class="form-text">
+                                    {{ field.help_text }}
+                                </div>
+                            {% endif %}
+
+                            {% if field.errors %}
+                                <div class="text-danger">
+                                    {{ field.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            Login
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-3 text-center">
+                    <p>
+                        <a href="{% url 'password_reset' %}">
+                            Forgot password?
+                        </a>
+                    </p>
+                    <p>
+                        Don't have an account?
+                        <a href="{% url 'register' %}">Register here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+### Design Notes
+
+* **Field iteration** keeps templates resilient to form changes
+* **Explicit CSRF token** reinforces security habits
+* **No custom JavaScript** required for validation
+* **Consistent spacing** via Bootstrap utilities only
+
+This pattern repeats cleanly for password reset and registration pages.
+
+---
+
+## Authenticated Page Example: Profile
+
+The profile page shows how authenticated data is surfaced safely and readably.
+
+### Full Listing: `accounts/profile.html`
+
+```html
+{% extends 'core/base.html' %}
+
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>Welcome to your profile, {{ user.username }}!</h2>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Your Information</h5>
+
+                <p><strong>Username:</strong> {{ user.username }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Member since:</strong> {{ user.date_joined|date:"F j, Y" }}</p>
+                <p><strong>Last login:</strong> {{ user.last_login|date:"F j, Y, g:i a" }}</p>
+                <p>
+                    <strong>Staff status:</strong>
+                    {% if user.is_staff %}Yes{% else %}No{% endif %}
+                </p>
+                <p>
+                    <strong>Superuser status:</strong>
+                    {% if user.is_superuser %}Yes{% else %}No{% endif %}
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a href="{% url 'index' %}" class="btn btn-secondary">
+                Back to Home
+            </a>
+            <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger ms-2">Logout</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+### Why This Matters
+
+This page is intentionally simple:
+
+* It proves authentication is wired correctly
+* It validates the custom user model
+* It provides a natural landing page after login
+
+In later tutorials, this page becomes the obvious place to surface subscription status, billing links, and feature access.
+
+---
+
+## Password Reset Templates (Brief Note)
+
+The remaining password reset templates (`password_reset_email.html`, `password_reset_confirm.html`, etc.) follow the same structural patterns:
+
+* Extend `core/base.html`
+* Centered card layout
+* Clear success and error messaging
+
+They are intentionally thin wrappers around Django’s built-in password reset views, which is exactly what you want for security-sensitive flows.
+
+---
+
+## Closing Note on Templates
+
+These templates are not flashy. They are:
+
+* **Readable**
+* **Predictable**
+* **Easy to reason about**
+* **Safe to extend**
+
+That combination is far more valuable in a SaaS foundation than clever abstractions or premature design systems.
+
+---
+
+## Step 5: Testing and Local Verification
+
+Create an admin user:
 
 ```bash
 python manage.py createsuperuser
 ```
 
-Run the server:
+Run the app:
 
 ```bash
 python manage.py runserver
 ```
 
-Test registration, login, and profile.
+Verify:
 
-**Reasoning:** Superuser allows admin panel access. Local testing ensures functionality before deployment.
+* Registration
+* Login / logout
+* Profile access
+* Admin panel
 
-For production (out of scope for this tutorial), add logging, static file serving, and consider Heroku/Docker. See the upcoming Tutorial 3 for a full deployment walkthrough.
+At this point, the app is fully runnable and coherent.
 
-## Technical accuracy & production notes
+---
 
-Note: the following are general production tips and checklist items. Full, step-by-step production deployment and hardening are out of scope for this first tutorial and will be covered in detail in Tutorial 3. Use these as high-level guidance only.
+## Production Notes (Preview Only)
 
-This section collects important, actionable details to avoid common pitfalls when moving from a local tutorial to a real deployment.
+Deployment, scaling, and billing are covered later. For now, keep these principles in mind:
 
-Security & settings
-- Keep `.env` out of version control and add it to `.gitignore`.
-- Use `django-environ` or similar to load `DATABASE_URL`, `DJANGO_SECRET_KEY`, and other secrets.
-- Example security settings to enable in production (`config/settings.py`):
+* `.env` stays out of Git
+* Use Postgres in production
+* Run `collectstatic`
+* Disable `DEBUG`
+* Serve via Gunicorn + Nginx
+* Add logging and monitoring before launch
 
-```python
-DEBUG = env.bool('DJANGO_DEBUG', default=False)
-if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    X_FRAME_OPTIONS = 'DENY'
-```
+---
 
-Databases
-- Use SQLite for development, but pick Postgres (recommended) for production.
-- Use `DATABASE_URL` and `django-environ` or `dj-database-url` to configure databases from env vars.
+## Final Thoughts
 
-Static files & assets
-- Set a `STATIC_ROOT` and run `python manage.py collectstatic` during deployment.
-- For simple deployments, use `whitenoise` to serve static files from Django. In a more robust setup, serve static assets via a CDN behind Nginx.
+This tutorial intentionally avoids shortcuts. The goal is not to impress with cleverness, but to create a **boring, reliable SaaS foundation** that survives growth.
 
-Migrations & custom user model
-- Always set `AUTH_USER_MODEL` before creating your initial migrations. If you change it later, you will need manual migration fixes.
-- Typical workflow after adding models:
+In the next tutorials, we’ll layer on:
 
-```bash
-python manage.py makemigrations
-python manage.py migrate
-```
+* Stripe subscriptions
+* Feature gating
+* Production deployment
+* CI and operational hardening
 
-Email and password reset during development
-- Use the console email backend while developing so reset emails print to the terminal:
+Start free. Build trust. Monetize later.
 
-```python
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-```
-
-Running in production
-- Common stack: Gunicorn + Nginx (Gunicorn runs the WSGI app; Nginx proxies, serves static files, and handles TLS).
-- Example command to start the app with Gunicorn:
-
-```bash
-gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
-```
-
-- Use process managers (systemd, supervisord) or container orchestration in production.
-
-Monitoring & logging
-- Enable structured logging and error reporting (Sentry, Rollbar) before public launch.
-
-Testing
-- Add tests for authentication flows (registration, login, password reset) and run them in CI.
-- Test key pages with `DEBUG=False` locally to catch template/static errors you won't see with `DEBUG=True`.
-
-## Visual Overview: Project Structure and Flows
-
-To better understand the project, here are visual representations of the structure and key flows.
-
-### Project Directory Tree
-
-After following the steps, your project structure should look like this (excluding virtual environment and cache files):
-
-```
-./
-├── .env
-├── .env.example
-├── .gitignore
-├── accounts/
-│   ├── __init__.py
-│   ├── admin.py
-│   ├── apps.py
-│   ├── forms.py
-│   ├── models.py
-│   ├── templates/
-│   │   └── accounts/
-│   │       ├── logged_out.html
-│   │       ├── login.html
-│   │       ├── password_reset.html
-│   │       ├── password_reset_complete.html
-│   │       ├── password_reset_confirm.html
-│   │       ├── password_reset_done.html
-│   │       ├── password_reset_email.html
-│   │       ├── profile.html
-│   │       └── register.html
-│   ├── tests.py
-│   ├── urls.py
-│   └── views.py
-├── config/
-│   ├── __init__.py
-│   ├── asgi.py
-│   ├── settings.py
-│   ├── urls.py
-│   └── wsgi.py
-├── core/
-│   ├── __init__.py
-│   ├── admin.py
-│   ├── apps.py
-│   ├── models.py
-│   ├── templates/
-│   │   └── core/
-│   │       ├── base.html
-│   │       └── index.html
-│   ├── tests.py
-│   ├── urls.py
-│   └── views.py
-├── db.sqlite3
-├── django.log
-├── manage.py
-├── requirements.txt
-├── tree.py
-└── tutorial-001.md
-```
-
-**Reasoning:** This tree helps you verify your setup and locate files quickly. The modular structure (apps in separate folders) makes it easy to add features like payments without cluttering the codebase.
-
-### Entity Relationship Diagram
-
-The data model is simple but extensible. Here's the ER diagram for the current models:
-
-```mermaid
-erDiagram
-    CUSTOMUSER {
-        string username
-        string email PK
-        datetime date_joined
-        boolean is_active
-        boolean is_staff
-        boolean is_superuser
-    }
-```
-
-**Reasoning:** ER diagrams clarify data relationships. Here, `CustomUser` is the core entity with email as the unique identifier. Future additions (e.g., posts, subscriptions) will expand this.
-
-### Sequence Diagram: User Registration Flow
-
-This shows the step-by-step interaction during registration:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Browser
-    participant Django
-    participant DB
-
-    User->>Browser: Fill registration form
-    Browser->>Django: POST /accounts/register/
-    Django->>Django: Validate form
-    Django->>DB: Create CustomUser
-    DB-->>Django: Success
-    Django-->>Browser: Redirect to login
-    Browser-->>User: Show success message
-```
-
-**Reasoning:** Sequence diagrams illustrate dynamic behavior. This flow ensures secure user creation with validation and feedback, preventing errors like duplicate emails.
-
-### Flowchart: Django Request-Response Cycle
-
-A high-level view of how Django processes requests:
-
-```mermaid
-flowchart TD
-    A[User Request] --> B{URL matches?}
-    B -->|Yes| C[View Function]
-    B -->|No| D[404 Error]
-    C --> E[Process Logic]
-    E --> F[Render Template]
-    F --> G[Return Response]
-```
-
-**Reasoning:** Flowcharts show decision points and logic flow. This diagram helps tune performance—e.g., optimize views or add caching at key steps.
-
-## Quick Commands Cheat Sheet
-
-```bash
-# Create and activate venv (Windows)
-python -m venv .venv
-.venv\Scripts\activate
-
-# macOS/Linux
-source .venv/bin/activate
-
-# Upgrade pip and install dependencies
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-
-# Start project and apps
-django-admin startproject config .
-python manage.py startapp accounts
-
-# Migrations and run
-python manage.py makemigrations
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-```
-
-## Conclusion: Free Today, Paid Tomorrow
-
-This template is suitable for local and free-tier SaaS apps like a prototype social platform where users can sign up, authenticate, and engage. Full production hardening (TLS, scaling, backups, CDN, etc.) is out of scope for this tutorial and will be covered in Tutorial 3.
-
-But the real power is extensibility. In upcoming tutorials, we'll add Stripe for payments, turning this into a full SaaS with tiers. This foundation will eventually support premium features unlocked via subscriptions.
-
-**Why this matters:** SaaS thrives on user growth first, monetization second. Start free, scale paid.
-
-Full code: [GitHub Repo Link]. Questions? Comment below!
+That’s how SaaS actually works.
