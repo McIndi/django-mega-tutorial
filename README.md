@@ -66,12 +66,31 @@ python -m venv .venv
 # macOS/Linux:
 source .venv/bin/activate
 
-# Upgrade pip and install dependencies
+# Upgrade pip
 python -m pip install --upgrade pip
-pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Install Dependencies
+
+Choose the installation option that suits your needs:
+
+```bash
+# Development (with testing and quality tools)
+pip install -e ".[dev]"
+
+# Production servers only (Cheroot + Daphne)
+pip install -e ".[servers]"
+
+# Everything (development + servers)
+pip install -e ".[all]"
+
+# Minimal (base only)
+pip install -e .
+```
+
+We recommend `pip install -e ".[dev]"` for local development.
+
+### 3. Configure Environment
 
 ```bash
 # Copy example environment file
@@ -84,7 +103,7 @@ copy .env.example .env  # Windows
 # - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 ```
 
-### 3. Initialize Database
+### 4. Initialize Database
 
 ```bash
 # Run migrations
@@ -94,13 +113,38 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-### 4. Run Development Server
+### 5. Run Development Server
 
 ```bash
-python manage.py runserver
+python manage.py serve
 ```
 
 Visit [http://127.0.0.1:8000](http://127.0.0.1:8000) to see the application.
+
+## Running with Docker
+
+To run the application with Docker and PostgreSQL:
+
+```bash
+# Start services (database + web)
+docker-compose up -d
+
+# Run migrations
+docker-compose exec web python manage.py migrate
+
+# Create superuser
+docker-compose exec web python manage.py createsuperuser
+
+# View logs
+docker-compose logs -f web
+
+# Stop services
+docker-compose down
+```
+
+The application will be available at [http://localhost:8000](http://localhost:8000).
+
+See [Tutorial 004](tutorial-004.md) for detailed Docker setup and customization.
 
 ## Testing
 
@@ -288,7 +332,20 @@ This project is built following a comprehensive tutorial series:
    - Pre-commit hooks
    - GitHub Actions CI workflow
 
-3. **More tutorials coming soon** - Topics will include user-facing features, production deployment, and subscription billing
+3. **[Tutorial 003](tutorial-003.md)** - Building a Link Shortener
+   - User-scoped link shortening feature
+   - Model design and CRUD operations
+   - TDD approach: Red → Green → Refactor
+   - Analytics with Click tracking
+
+4. **[Tutorial 004](tutorial-004.md)** - Production-Ready Servers and Docker
+   - Custom management commands (serve, serve_async)
+   - Cheroot and Daphne WSGI/ASGI servers
+   - TLS/HTTPS support
+   - Dockerfile with multi-stage build
+   - docker-compose with PostgreSQL
+
+5. **More tutorials coming soon** - Topics will include subscription billing, background tasks, Let's Encrypt integration, and production monitoring
 
 ## Why Django for SaaS?
 
