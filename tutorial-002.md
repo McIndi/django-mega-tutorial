@@ -366,9 +366,11 @@ These practices do not guarantee correctness, but they **dramatically reduce ris
 
 ### What Comes Next
 
-Tutorial 003 will build on this foundation by introducing:
+Future tutorials will build on this foundation by introducing:
 
-* deployment and operational hardening
+* user-facing features and functionality
+* production deployment and operational hardening
+* subscription billing and payment processing
 
 ---
 
@@ -378,4 +380,4 @@ Tutorial 003 will build on this foundation by introducing:
 | ------------ | ----------------------- | -------- |
 | Tutorial 001 | Django SaaS foundation  | Complete |
 | Tutorial 002 | Testing, quality, CI    | Complete |
-| Tutorial 003 | Deployment              | Upcoming |
+| Future       | Additional topics       | Upcoming |
