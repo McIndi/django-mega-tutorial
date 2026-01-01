@@ -261,10 +261,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
   pull_request:
-    branches: [main, develop]
-
 jobs:
   test-and-quality:
     runs-on: ubuntu-latest
