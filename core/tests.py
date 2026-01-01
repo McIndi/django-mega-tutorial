@@ -8,6 +8,6 @@ class CoreViewsTest(TestCase):
 
     def test_index_view(self):
         """Test the index view renders correctly."""
-        response = self.client.get(reverse('index'))
+        response = self.client.get(reverse("index"))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'core/index.html')
+        self.assertTemplateUsed(response, "core/index.html")
