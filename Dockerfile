@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files (including pyproject.toml)
-COPY pyproject.toml .
+# Copy source so editable install can find packages
+COPY . .
 
 # Create venv and install dependencies in it
 # Install with [all] extras for comprehensive tooling (both servers, testing, quality)
@@ -60,4 +60,4 @@ EXPOSE 8000
 
 # Default command: run the serve management command
 # Can be overridden with serve_async or other commands
-CMD ["python", "manage.py", "serve", "--host", "0.0.0.0"]
+CMD ["/opt/venv/bin/python", "manage.py", "serve", "--host", "0.0.0.0"]

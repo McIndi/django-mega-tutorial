@@ -3,8 +3,7 @@ version: "3.9"
 services:
   # PostgreSQL database service
   db:
-    image: postgres:16-alpine
-    container_name: django_saas_db
+    image: docker.io/postgres:18-alpine
     environment:
       POSTGRES_DB: ${DB_NAME:-django_saas}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -12,9 +11,6 @@ services:
     volumes:
       # Persist database data across container restarts
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      # Expose on localhost for development; comment out for production
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
@@ -24,13 +20,20 @@ services:
   # Django web application service
   web:
     build: .
-    container_name: django_saas_web
     command: python manage.py serve --host 0.0.0.0
     environment:
       # Django settings
       DEBUG: ${DJANGO_DEBUG:-False}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+
+      # Database configuration (PostgreSQL via docker-compose)
+      DATABASE_ENGINE: postgresql
+      DATABASE_NAME: ${DB_NAME:-django_saas}
+      DATABASE_USER: ${DB_USER:-postgres}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-postgres}
+      DATABASE_HOST: db
+      DATABASE_PORT: ${DB_PORT:-5432}
 
       # Server configuration
       SERVER_HOST: 0.0.0.0

@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 cheroot = ["cheroot"]
 daphne = ["daphne"]
+postgres = ["psycopg2-binary"]
 dev = [
     "black",
     "mypy",
@@ -26,8 +27,9 @@ dev = [
     "bandit",
     "pre-commit",
     "coverage",
+    "psycopg2-binary",
 ]
-servers = ["cheroot", "daphne"]
+servers = ["cheroot", "daphne", "psycopg2-binary"]
 all = [
     "black",
     "mypy",
@@ -37,6 +39,7 @@ all = [
     "coverage",
     "cheroot",
     "daphne",
+    "psycopg2-binary",
 ]
 
 [tool.black]

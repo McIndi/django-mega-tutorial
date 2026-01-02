@@ -671,8 +671,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files (including pyproject.toml)
+# Copy project metadata early for caching
 COPY pyproject.toml .
+
+# Copy source so editable installs can find packages
+COPY . .
 
 # Create venv and install dependencies in it
 # Install with [all] extras for comprehensive tooling (both servers, testing, quality)
@@ -724,8 +727,10 @@ CMD ["python", "manage.py", "serve", "--host", "0.0.0.0"]
 1. **Multi-stage build**: Builder stage installs dependencies, runtime stage is lean
 2. **Non-root user**: Containers should not run as `root` (security best practice)
 3. **Slim base image**: `python:3.14-slim` is 50% smaller than the default `python:3.14`
-4. **Virtual environment**: Preserves isolation even in the container
-5. **Default command**: `serve --host 0.0.0.0` listens on all interfaces (required in containers)
+4. **Copy source before editable install**: `pip install -e .` needs the source tree in the build context to find `accounts`, `core`, etc.
+5. **Virtual environment**: Preserves isolation even in the container
+6. **Default command**: `serve --host 0.0.0.0` listens on all interfaces (required in containers)
+7. **.dockerignore recommended**: Exclude `.git`, `.venv`, `dist`, `build`, `.mypy_cache`, and other local artifacts to shrink build contexts and keep caches effective.
 
 ---
 
@@ -739,8 +744,7 @@ version: "3.9"
 services:
   # PostgreSQL database service
   db:
-    image: postgres:16-alpine
-    container_name: django_saas_db
+        image: docker.io/postgres:18-alpine
     environment:
       POSTGRES_DB: ${DB_NAME:-django_saas}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -760,7 +764,6 @@ services:
   # Django web application service
   web:
     build: .
-    container_name: django_saas_web
     command: python manage.py serve --host 0.0.0.0
     environment:
       # Django settings
@@ -798,6 +801,175 @@ volumes:
 4. **Development-friendly**: Source code mount allows hot reloading during development
 5. **Defaults**: Sensible defaults for quick startup; override via environment
 
+**Podman notes:**
+
+- Podman enforces fully qualified image names. Prefix upstream images (e.g., `docker.io/postgres:18-alpine`) or configure `registries.conf` search registries to avoid `short-name ... did not resolve` errors.
+- When you change the Dockerfile (e.g., copying the source before `pip install -e .`), rebuild with `podman-compose build --no-cache` so the builder sees the updated context.
+
+---
+
+### Step 3: Configure Database Support with Environment Variables
+
+To enable PostgreSQL in Docker while keeping SQLite for local development and CI, we need to update Django's database configuration to support environment variables.
+
+#### Update `config/settings.py`
+
+Replace the static `DATABASES` configuration with an environment-aware version:
+
+```python
+# Database
+# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+#
+# Configuration priority:
+# 1. If DATABASE_ENGINE env var is set, use that backend with provided credentials
+# 2. Otherwise, default to SQLite (suitable for CI and local development)
+#
+# For PostgreSQL in Docker, set:
+#   DATABASE_ENGINE=postgresql
+#   DATABASE_NAME=<db_name>
+#   DATABASE_USER=<db_user>
+#   DATABASE_PASSWORD=<db_password>
+#   DATABASE_HOST=<host>
+#   DATABASE_PORT=<port>
+
+if env("DATABASE_ENGINE", default=None):
+    # Use PostgreSQL (or other database specified by DATABASE_ENGINE)
+    if env("DATABASE_ENGINE") == "postgresql":
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": env("DATABASE_NAME", default="django_saas"),
+                "USER": env("DATABASE_USER", default="postgres"),
+                "PASSWORD": env("DATABASE_PASSWORD", default=""),
+                "HOST": env("DATABASE_HOST", default="localhost"),
+                "PORT": env("DATABASE_PORT", default="5432"),
+            }
+        }
+    else:
+        # Generic fallback for other database engines
+        DATABASES = {
+            "default": {
+                "ENGINE": f"django.db.backends.{env('DATABASE_ENGINE')}",
+                "NAME": env("DATABASE_NAME", default="db"),
+            }
+        }
+else:
+    # Default: SQLite for development and CI
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+```
+
+**Key design decisions:**
+
+1. **SQLite by default**: When no `DATABASE_ENGINE` is set, use SQLite (perfect for CI and quick local testing)
+2. **PostgreSQL support**: When `DATABASE_ENGINE=postgresql`, read credentials from environment variables
+3. **Sensible defaults**: Provide defaults for all PostgreSQL settings (name, user, host, port)
+4. **Extensible**: Can support other database backends by setting `DATABASE_ENGINE` to `mysql`, etc.
+
+#### Update `.env.example`
+
+Add database configuration documentation:
+
+```dotenv
+DJANGO_SETTINGS_MODULE=config.settings
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_SECRET_KEY=
+
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8000
+SERVER_NUMTHREADS=10
+
+# Optional: TLS/HTTPS support
+# SERVER_TLS_CERT=/path/to/cert.pem
+# SERVER_TLS_KEY=/path/to/key.pem
+
+# Database configuration (optional; defaults to SQLite)
+# For PostgreSQL, set DATABASE_ENGINE and provide credentials:
+# DATABASE_ENGINE=postgresql
+# DATABASE_NAME=django_saas
+# DATABASE_USER=postgres
+# DATABASE_PASSWORD=your-password
+# DATABASE_HOST=localhost
+# DATABASE_PORT=5432
+```
+
+#### Update `docker-compose.yaml`
+
+Add database environment variables to the web service so it can connect to PostgreSQL:
+
+```yaml
+  # Django web application service
+  web:
+    build: .
+    command: python manage.py serve --host 0.0.0.0
+    environment:
+      # Django settings
+      DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+
+      # Database configuration (PostgreSQL via docker-compose)
+      DATABASE_ENGINE: postgresql
+      DATABASE_NAME: ${DB_NAME:-django_saas}
+      DATABASE_USER: ${DB_USER:-postgres}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-postgres}
+      DATABASE_HOST: db
+      DATABASE_PORT: ${DB_PORT:-5432}
+
+      # Server configuration
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: ${SERVER_PORT:-8000}
+      SERVER_NUMTHREADS: ${SERVER_NUMTHREADS:-10}
+```
+
+**Note on DATABASE_HOST**: We set `DATABASE_HOST: db` because Docker Compose automatically creates a network where services can reach each other by service name.
+
+#### Add PostgreSQL Driver
+
+Update `pyproject.toml` to include `psycopg2-binary` (the PostgreSQL adapter):
+
+```toml
+[project.optional-dependencies]
+cheroot = ["cheroot"]
+daphne = ["daphne"]
+postgres = ["psycopg2-binary"]
+dev = [
+    "black",
+    "mypy",
+    "django-stubs",
+    "bandit",
+    "pre-commit",
+    "coverage",
+    "psycopg2-binary",
+]
+servers = ["cheroot", "daphne", "psycopg2-binary"]
+all = [
+    "black",
+    "mypy",
+    "django-stubs",
+    "bandit",
+    "pre-commit",
+    "coverage",
+    "cheroot",
+    "daphne",
+    "psycopg2-binary",
+]
+```
+
+Now `pip install -e ".[all]"` (used in the Dockerfile) will include PostgreSQL support.
+
+**Why this approach works:**
+
+- **Local development**: No environment variables set → uses SQLite
+- **CI**: No environment variables set → uses SQLite (fast, no external services)
+- **Docker Compose**: `DATABASE_ENGINE=postgresql` set → connects to PostgreSQL container
+- **Production**: Set `DATABASE_ENGINE=postgresql` with your production database credentials
+
 ---
 
 ## Part 3: Running Locally
@@ -825,6 +997,12 @@ python manage.py serve --tls-cert cert.pem --tls-key key.pem
 ```bash
 # Start services in the background
 docker-compose up -d
+
+# Run database migrations (first time setup)
+docker-compose exec web python manage.py migrate
+
+# Create a superuser (first time setup)
+docker-compose exec web python manage.py createsuperuser
 
 # View logs
 docker-compose logs -f web
@@ -944,6 +1122,14 @@ Production deployments **must** set:
 DJANGO_DEBUG=False
 DJANGO_SECRET_KEY=<strong-random-key>
 DJANGO_ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+
+# PostgreSQL connection for production database
+DATABASE_ENGINE=postgresql
+DATABASE_NAME=your_production_db
+DATABASE_USER=your_db_user
+DATABASE_PASSWORD=<strong-db-password>
+DATABASE_HOST=your-db-host.example.com
+DATABASE_PORT=5432
 ```
 
 Never hardcode secrets or rely on defaults.
@@ -969,14 +1155,17 @@ Or use a separate migration service before deploying the web service.
 | `serve_async` command | ASGI server for async/WebSocket apps |
 | Dockerfile | Multi-stage build for deployment |
 | docker-compose.yaml | Local PostgreSQL + web service |
+| Database configuration | Environment-based PostgreSQL support with SQLite fallback |
 | Test suite | 13 new tests covering server behavior |
 
 You now have a production-ready Django SaaS that can:
 
 - Run locally with `python manage.py serve` or `serve_async`
-- Run in Docker with `docker-compose up`
+- Use SQLite for development and CI (no database setup required)
+- Run in Docker with `docker-compose up` and connect to PostgreSQL
 - Deploy to any container orchestration platform
 - Support TLS/HTTPS for secure communication
+- Switch between databases via environment variables
 
 ---
 

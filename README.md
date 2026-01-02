@@ -146,6 +146,10 @@ The application will be available at [http://localhost:8000](http://localhost:80
 
 See [Tutorial 004](tutorial-004.md) for detailed Docker setup and customization.
 
+**Podman tips:**
+- Use fully qualified images (e.g., `docker.io/postgres:18-alpine`) to avoid short-name resolution errors.
+- After changing the Dockerfile (such as copying the source before `pip install -e .`), run `podman-compose build --no-cache` so the builder sees the new context.
+
 ## Testing
 
 ### Run Tests
