@@ -7,6 +7,11 @@ on:
 jobs:
   test-and-quality:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SECRET_KEY: ci-test-key
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      DJANGO_SETTINGS_MODULE: config.settings
 
     steps:
       - uses: actions/checkout@v4
