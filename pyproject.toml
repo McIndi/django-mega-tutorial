@@ -5,8 +5,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["accounts", "config", "core", "links"]
 
-[tool.setuptools.packages.find]
-exclude = ["tests*", "migrations*", "__pycache__*"]
 
 [project]
 name = "django-mega-tutorial"
