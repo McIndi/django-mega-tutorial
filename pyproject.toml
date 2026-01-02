@@ -1,3 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["accounts", "config", "core", "links"]
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "migrations*", "__pycache__*"]
+
 [project]
 name = "django-mega-tutorial"
 version = "0.1.0"
