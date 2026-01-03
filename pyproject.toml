@@ -1,3 +1,47 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["accounts", "config", "core", "links"]
+
+
+[project]
+name = "django-mega-tutorial"
+version = "0.1.0"
+description = "Production-minded Django SaaS starter template"
+requires-python = ">=3.12"
+dependencies = [
+    "django",
+    "django-environ",
+]
+
+[project.optional-dependencies]
+cheroot = ["cheroot"]
+daphne = ["daphne"]
+postgres = ["psycopg2-binary"]
+dev = [
+    "black",
+    "mypy",
+    "django-stubs",
+    "bandit",
+    "pre-commit",
+    "coverage",
+    "psycopg2-binary",
+]
+servers = ["cheroot", "daphne", "psycopg2-binary"]
+all = [
+    "black",
+    "mypy",
+    "django-stubs",
+    "bandit",
+    "pre-commit",
+    "coverage",
+    "cheroot",
+    "daphne",
+    "psycopg2-binary",
+]
+
 [tool.black]
 line-length = 88
 target-version = ['py314']

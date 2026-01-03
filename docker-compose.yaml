@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  # PostgreSQL database service
+  db:
+    image: docker.io/postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-django_saas}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      # Persist database data across container restarts
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django web application service
+  web:
+    build: .
+    command: python manage.py serve --host 0.0.0.0
+    environment:
+      # Django settings
+      DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+
+      # Database configuration (PostgreSQL via docker-compose)
+      DATABASE_ENGINE: postgresql
+      DATABASE_NAME: ${DB_NAME:-django_saas}
+      DATABASE_USER: ${DB_USER:-postgres}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-postgres}
+      DATABASE_HOST: db
+      DATABASE_PORT: ${DB_PORT:-5432}
+
+      # Server configuration
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: ${SERVER_PORT:-8000}
+      SERVER_NUMTHREADS: ${SERVER_NUMTHREADS:-10}
+
+    ports:
+      # Expose web server
+      - "${SERVER_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount source code for development (optional; comment out for production)
+      - .:/app
+    # Restart policy
+    restart: unless-stopped
+
+volumes:
+  # Named volume for PostgreSQL data persistence
+  postgres_data:

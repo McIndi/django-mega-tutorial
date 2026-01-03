@@ -84,13 +84,48 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+#
+# Configuration priority:
+# 1. If DATABASE_ENGINE env var is set, use that backend with provided credentials
+# 2. Otherwise, default to SQLite (suitable for CI and local development)
+#
+# For PostgreSQL in Docker, set:
+#   DATABASE_ENGINE=postgresql
+#   DATABASE_NAME=<db_name>
+#   DATABASE_USER=<db_user>
+#   DATABASE_PASSWORD=<db_password>
+#   DATABASE_HOST=<host>
+#   DATABASE_PORT=<port>
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+if env("DATABASE_ENGINE", default=None):
+    # Use PostgreSQL (or other database specified by DATABASE_ENGINE)
+    if env("DATABASE_ENGINE") == "postgresql":
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": env("DATABASE_NAME", default="django_saas"),
+                "USER": env("DATABASE_USER", default="postgres"),
+                "PASSWORD": env("DATABASE_PASSWORD", default=""),
+                "HOST": env("DATABASE_HOST", default="localhost"),
+                "PORT": env("DATABASE_PORT", default="5432"),
+            }
+        }
+    else:
+        # Generic fallback for other database engines
+        DATABASES = {
+            "default": {
+                "ENGINE": f"django.db.backends.{env('DATABASE_ENGINE')}",
+                "NAME": env("DATABASE_NAME", default="db"),
+            }
+        }
+else:
+    # Default: SQLite for development and CI
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field

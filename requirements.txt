@@ -1,9 +1,0 @@
-django
-django-environ
-# Quality and tooling
-black
-mypy
-django-stubs
-bandit
-pre-commit
-coverage
