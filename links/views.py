@@ -1,12 +1,15 @@
 import logging
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
+from django.conf import settings
 from django.http import Http404
 from django.db.models import Count
-from django.shortcuts import redirect
 from django.urls import reverse_lazy
-from django.views import View
+from django.shortcuts import redirect
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.validators import validate_ipv46_address
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -14,6 +17,7 @@ from django.views.generic import (
     ListView,
     UpdateView,
 )
+
 
 from .forms import LinkForm
 from .models import Click, Link
@@ -49,35 +53,37 @@ class LinkDetailView(LoginRequiredMixin, DetailView):
         # Build full URL
         context["full_url"] = self.request.build_absolute_uri(link.public_path)
 
-        # Aggregate click statistics
-        clicks = link.clicks.all()
-        context["total_clicks"] = clicks.count()
+        # Aggregate click statistics with database-side optimizations
+        # COUNT(*) is fast even on large tables (uses index)
+        context["total_clicks"] = link.clicks.count()
 
         logger.debug(
             f"Link detail viewed: {link.public_path} ({context['total_clicks']} clicks)",
             extra={"link_id": link.id, "user_id": self.request.user.id},
         )
 
-        # Top referrers
+        # Top referrers - aggregated at DB, limited to 5 rows
         referrer_stats = (
-            clicks.exclude(referrer="")
+            link.clicks.exclude(referrer="")
             .values("referrer")
             .annotate(count=Count("id"))
             .order_by("-count")[:5]
         )
         context["top_referrers"] = referrer_stats
 
-        # Top user agents
+        # Top user agents - aggregated at DB, limited to 5 rows
         user_agent_stats = (
-            clicks.exclude(user_agent="")
+            link.clicks.exclude(user_agent="")
             .values("user_agent")
             .annotate(count=Count("id"))
             .order_by("-count")[:5]
         )
         context["top_user_agents"] = user_agent_stats
 
-        # Recent clicks
-        context["recent_clicks"] = clicks[:10]
+        # Recent clicks - only select necessary fields to reduce memory/transfer
+        context["recent_clicks"] = link.clicks.values(
+            "id", "referrer", "user_agent", "created_at", "ip_address"
+        ).order_by("-created_at")[:10]
 
         return context
 
@@ -180,9 +186,20 @@ class LinkPublicRedirectView(View):
         return redirect(link.target_url)
 
     def _get_client_ip(self, request):
+        """Extract client IP safely, validating X-Forwarded-For only if trusted."""
+        # Use X-Forwarded-For only if explicitly trusted (behind known proxy)
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]
+        if x_forwarded_for and settings.TRUST_PROXY_HEADERS:
+            ip = x_forwarded_for.split(",")[0].strip()
         else:
             ip = request.META.get("REMOTE_ADDR")
+
+        # Validate IP format to prevent malformed data
+        if ip:
+            try:
+                validate_ipv46_address(ip)
+            except ValidationError:
+                logger.warning(f"Invalid IP format: {ip}", extra={"ip": ip})
+                return None
+
         return ip if ip else None

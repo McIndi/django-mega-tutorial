@@ -2,11 +2,12 @@ import secrets
 import string
 
 from django.conf import settings
+from django.core.validators import RegexValidator
 from django.db import models
 
 
 SLUG_ALPHABET = string.ascii_lowercase + string.digits
-SLUG_LENGTH = 8
+SLUG_LENGTH = 10
 
 
 def generate_slug(length: int = SLUG_LENGTH) -> str:
@@ -20,7 +21,16 @@ class Link(models.Model):
         related_name="links",
     )
     target_url = models.URLField(max_length=500)
-    slug = models.SlugField(max_length=32, blank=True)
+    slug = models.SlugField(
+        max_length=32,
+        blank=True,
+        validators=[
+            RegexValidator(
+                regex=r"^[a-z0-9_-]+$",
+                message="Use only lowercase letters, numbers, hyphens, and underscores.",
+            )
+        ],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -44,12 +54,13 @@ class Link(models.Model):
             self.slug = self._generate_unique_slug()
         super().save(*args, **kwargs)
 
-    def _generate_unique_slug(self) -> str:
-        # Simple loop because collisions are rare; retries are inexpensive at this scale.
-        while True:
-            candidate = generate_slug()
+    def _generate_unique_slug(self, attempts: int = 10) -> str:
+        """Generate a per-user unique slug with bounded retries."""
+        for _ in range(attempts):
+            candidate = generate_slug(length=SLUG_LENGTH)
             if not Link.objects.filter(user=self.user, slug=candidate).exists():
                 return candidate
+        raise RuntimeError("Could not generate unique slug after multiple attempts")
 
 
 class Click(models.Model):

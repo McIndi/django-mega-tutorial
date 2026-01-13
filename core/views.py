@@ -18,21 +18,15 @@ def health_check(request):
     Returns:
         200 OK with JSON if healthy
         503 Service Unavailable if unhealthy (e.g., database down)
-    """
-    health_status = {
-        "status": "healthy",
-    }
 
+    Response intentionally minimal to avoid information disclosure.
+    """
     # Check database connectivity
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-        health_status["database"] = "connected"
-        logger.debug("Health check: database connected")
+        logger.debug("Health check: passed")
+        return JsonResponse({"status": "ok"}, status=200)
     except Exception as e:
-        health_status["status"] = "unhealthy"
-        health_status["database"] = "disconnected"
-        logger.error(f"Health check: database connection failed: {e}")
-        return JsonResponse(health_status, status=503)
-
-    return JsonResponse(health_status, status=200)
+        logger.error(f"Health check failed: {e}")
+        return JsonResponse({"status": "error"}, status=503)

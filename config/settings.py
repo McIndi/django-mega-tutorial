@@ -30,8 +30,27 @@ if not SECRET_KEY:
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 if DEBUG:
     print("WARNING: Django DEBUG mode is ON. This should be turned off in production!")
+else:
+    # Production security headers
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_SECURITY_POLICY = {
+        "default-src": ("'self'",),
+        "script-src": ("'self'", "cdn.jsdelivr.net"),
+        "style-src": ("'self'", "cdn.jsdelivr.net"),
+    }
 
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
+if DEBUG is False and not ALLOWED_HOSTS:
+    raise ValueError("DJANGO_ALLOWED_HOSTS must be set when DEBUG=False")
+
+# Proxy configuration
+TRUST_PROXY_HEADERS = env.bool("TRUST_PROXY_HEADERS", default=False)
 
 # Email
 EMAIL_BACKEND = env(

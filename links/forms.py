@@ -23,7 +23,13 @@ class LinkForm(forms.ModelForm):
 
     def clean_slug(self):
         slug = self.cleaned_data.get("slug")
-        if not slug or not self.user:
+        if not slug:
+            return slug
+
+        # Normalize to lowercase to match allowed character set and avoid duplicates
+        slug = slug.lower()
+
+        if not self.user:
             return slug
         qs = Link.objects.filter(user=self.user, slug=slug)
         if self.instance.pk:

@@ -39,14 +39,14 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             logger.info(
-                f"User logged in: {user.username}",
-                extra={"user_id": user.id, "username": user.username},
+                "User logged in",
+                extra={"user_id": user.id},
             )
             messages.success(request, f"Welcome back, {user.username}!")
             return redirect("profile")
         else:
             logger.warning(
-                f"Failed login attempt for username: {request.POST.get('username', 'unknown')}",
+                "Failed login attempt",
                 extra={"errors": form.errors.as_data()},
             )
     else:
@@ -61,8 +61,8 @@ def logout_view(request):
         user_id = request.user.id
         logout(request)
         logger.info(
-            f"User logged out: {username}",
-            extra={"user_id": user_id, "username": username},
+            "User logged out",
+            extra={"user_id": user_id},
         )
         messages.info(request, "You have been logged out.")
         return redirect("core:index")
@@ -73,7 +73,7 @@ def logout_view(request):
 @login_required
 def profile_view(request):
     logger.debug(
-        f"Profile accessed by {request.user.username}",
+        "Profile accessed",
         extra={"user_id": request.user.id},
     )
     return render(request, "accounts/profile.html", {"user": request.user})
@@ -109,8 +109,8 @@ class RegisterView(CreateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         logger.info(
-            f"New user registered: {self.object.username} ({self.object.email})",
-            extra={"user_id": self.object.id, "username": self.object.username},
+            "New user registered",
+            extra={"user_id": self.object.id},
         )
         messages.success(self.request, "Account created successfully! Please log in.")
         return response

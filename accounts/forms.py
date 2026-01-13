@@ -47,8 +47,8 @@ class CustomUserCreationForm(UserCreationForm):
         if commit:
             user.save()
             logger.debug(
-                f"User created via form: {user.username}",
-                extra={"username": user.username, "email": user.email},
+                "User created via form",
+                extra={"user_id": user.id},
             )
         return user
 

@@ -3,7 +3,7 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Click, Link
+from .models import Click, Link, SLUG_LENGTH
 
 
 class LinkModelTests(TestCase):
@@ -20,7 +20,7 @@ class LinkModelTests(TestCase):
         link = Link.objects.create(user=self.alice, target_url="https://example.com")
 
         self.assertTrue(link.slug)
-        self.assertEqual(len(link.slug), 8)
+        self.assertEqual(len(link.slug), SLUG_LENGTH)
         self.assertEqual(link.public_path, f"/{self.alice.username}/{link.slug}/")
 
     def test_slug_unique_per_user(self) -> None:

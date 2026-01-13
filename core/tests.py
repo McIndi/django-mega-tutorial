@@ -366,16 +366,17 @@ class HealthCheckTests(TestCase):
 
         data = response.json()
         self.assertIn("status", data)
-        self.assertEqual(data["status"], "healthy")
+        self.assertEqual(data["status"], "ok")
+        # Response should remain minimal to avoid leaking internals
+        self.assertEqual(set(data.keys()), {"status"})
 
-    def test_health_check_includes_database_status(self):
-        """Test that health check verifies database connectivity."""
+    def test_health_check_hides_database_status(self):
+        """Health check should not expose database state in the response body."""
         response = self.client.get("/health/")
         self.assertEqual(response.status_code, 200)
 
         data = response.json()
-        self.assertIn("database", data)
-        self.assertEqual(data["database"], "connected")
+        self.assertNotIn("database", data)
 
     def test_health_check_does_not_require_authentication(self):
         """Test that health check is accessible without login."""
