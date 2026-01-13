@@ -10,6 +10,7 @@ This project provides a clean foundation for building a Django-based SaaS applic
 
 - **Email-first authentication** - Custom user model with email as the primary identifier
 - **Complete auth flows** - Registration, login, logout, password reset, and profile management
+- **Transactional emails** - Welcome emails, password resets, and admin notifications with HTML templates
 - **Bootstrap 5 UI** - Responsive, accessible design with light/dark theme toggle
 - **Automated testing** - Comprehensive test suite covering authentication, forms, views, and edge cases
 - **Code quality tools** - Black, MyPy, and Bandit for formatting, type checking, and security scanning
@@ -186,9 +187,19 @@ The test suite includes:
 - Registration and login forms
 - Authentication views and flows
 - Password reset workflow
+- Email sending and templates
 - Admin interface permissions
 - Security and edge case handling
 - End-to-end integration tests
+
+### Test Email Configuration
+
+```bash
+# Send a test email to verify your SMTP settings
+python manage.py test_email your-email@example.com
+```
+
+This command will send a welcome email to the specified address, helping you verify that your email backend is configured correctly.
 
 ## Code Quality
 
@@ -352,7 +363,20 @@ This project is built following a comprehensive tutorial series:
    - Dockerfile with multi-stage build
    - docker-compose with PostgreSQL
 
-5. **More tutorials coming soon** - Topics will include subscription billing, background tasks, Let's Encrypt integration, and production monitoring
+5. **[Tutorial 005](tutorial-005.md)** - Production Readiness: Static Files, Logging, and Health Checks
+   - WhiteNoise for efficient static file serving
+   - Structured logging across all apps
+   - Custom error pages (404, 500)
+   - Health check endpoint for load balancers
+
+6. **[Tutorial 006](tutorial-006.md)** - Transactional Emails and SMTP Configuration
+   - Email backend configuration (SMTP, Gmail, Mailchimp)
+   - Welcome emails on registration
+   - HTML and text email templates
+   - Admin error notifications
+   - Test email command
+
+7. **More tutorials coming soon** - Topics will include subscription billing, background tasks, Let's Encrypt integration, and production monitoring
 
 ## Why Django for SaaS?
 

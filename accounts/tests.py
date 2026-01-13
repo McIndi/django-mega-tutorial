@@ -206,6 +206,36 @@ class AccountsViewsTest(TestCase):
         )
 
 
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="product@example.com",
+)
+class RegistrationEmailTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_welcome_email_sent_on_registration(self):
+        response = self.client.post(
+            reverse("register"),
+            {
+                "username": "welcomeuser",
+                "email": "welcome@example.com",
+                "password1": "securepassword123",
+                "password2": "securepassword123",
+            },
+        )
+
+        self.assertRedirects(response, reverse("login"))
+        self.assertEqual(len(mail.outbox), 1)
+
+        email = mail.outbox[0]
+        self.assertEqual(email.subject, "Welcome to Django SaaS")
+        self.assertEqual(email.from_email, "product@example.com")
+        self.assertIn("welcomeuser", email.body)
+        self.assertGreaterEqual(len(email.alternatives), 1)
+        self.assertEqual(email.alternatives[0][1], "text/html")
+
+
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class PasswordResetFlowTests(TestCase):
     def setUp(self):

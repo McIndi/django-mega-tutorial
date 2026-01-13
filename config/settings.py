@@ -54,9 +54,32 @@ TRUST_PROXY_HEADERS = env.bool("TRUST_PROXY_HEADERS", default=False)
 
 # Email
 EMAIL_BACKEND = env(
-    "DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.locmem.EmailBackend"
+    "DJANGO_EMAIL_BACKEND",
+    default=(
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    ),
 )
-DEFAULT_FROM_EMAIL = env("DJANGO_DEFAULT_FROM_EMAIL", default="webmaster@localhost")
+EMAIL_HOST = env("DJANGO_EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("DJANGO_EMAIL_PORT", default=1025 if DEBUG else 587)
+EMAIL_HOST_USER = env("DJANGO_EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("DJANGO_EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_SSL = env.bool("DJANGO_EMAIL_USE_SSL", default=False)
+EMAIL_USE_TLS = env.bool("DJANGO_EMAIL_USE_TLS", default=not EMAIL_USE_SSL)
+EMAIL_TIMEOUT = env.int("DJANGO_EMAIL_TIMEOUT", default=10)
+DEFAULT_FROM_EMAIL = env("DJANGO_DEFAULT_FROM_EMAIL", default="noreply@example.com")
+SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
+EMAIL_REPLY_TO = env.list("DJANGO_EMAIL_REPLY_TO", default=[])
+
+# Admin email notifications for errors (500s)
+ADMINS = [
+    (name.strip(), email.strip())
+    for name, email in [
+        tuple(admin.split(":")) for admin in env.list("DJANGO_ADMINS", default=[])
+    ]
+]
+MANAGERS = ADMINS
 
 # Application definition
 INSTALLED_APPS = [

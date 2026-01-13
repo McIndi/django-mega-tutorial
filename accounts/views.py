@@ -17,10 +17,11 @@ from django.contrib.auth.views import (
 )
 from django.http import HttpResponseNotAllowed
 from django.contrib import messages
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
+from core.email import send_templated_email
 from .forms import (
     CustomUserCreationForm,
     CustomAuthenticationForm,
@@ -111,6 +112,12 @@ class RegisterView(CreateView):
         logger.info(
             "New user registered",
             extra={"user_id": self.object.id},
+        )
+        send_templated_email(
+            subject="Welcome to Django SaaS",
+            template_base="emails/welcome_email",
+            context={"user": self.object, "login_url": reverse("login")},
+            to=[self.object.email],
         )
         messages.success(self.request, "Account created successfully! Please log in.")
         return response

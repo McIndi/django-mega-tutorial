@@ -1,0 +1,10 @@
+Hi {{ user.username }},
+
+Welcome to Django SaaS! We're glad you're here.
+
+You can log in at {{ login_url }} and start creating and sharing links.
+
+If you have any questions, just reply to this email and we will help.
+
+Thanks,
+The Django SaaS Team
