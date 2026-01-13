@@ -157,7 +157,7 @@ class AccountsViewsTest(TestCase):
         """Test logout view with POST request."""
         self.client.login(username="test@example.com", password="securepassword123")
         response = self.client.post(reverse("logout"))
-        self.assertRedirects(response, reverse("index"))
+        self.assertRedirects(response, reverse("core:index"))
         messages = list(get_messages(response.wsgi_request))
         self.assertEqual(len(messages), 1)
         self.assertEqual(str(messages[0]), "You have been logged out.")
@@ -471,7 +471,7 @@ class IntegrationFlowTests(TestCase):
         )
 
         logout_response = self.client.post(reverse("logout"))
-        self.assertRedirects(logout_response, reverse("index"))
+        self.assertRedirects(logout_response, reverse("core:index"))
 
         profile_response = self.client.get(reverse("profile"))
         self.assertRedirects(

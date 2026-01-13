@@ -5,12 +5,15 @@ Supports TLS and other options. Suitable for applications using async views or W
 This command allows testing async compatibility even when not actively using WebSockets.
 """
 
+import logging
 import os
 import sys
 
 from daphne.server import Server
 from django.core.asgi import get_asgi_application
 from django.core.management.base import BaseCommand
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -77,6 +80,8 @@ class Command(BaseCommand):
             **server_kwargs,
         )
 
+        logger.info(f"Starting Daphne ASGI server on {protocol}://{host}:{port}/")
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"Starting Daphne ASGI server on {protocol}://{host}:{port}/"
@@ -87,5 +92,6 @@ class Command(BaseCommand):
         try:
             server.run()
         except KeyboardInterrupt:
+            logger.info("Shutting down server...")
             self.stdout.write(self.style.SUCCESS("\nShutting down server..."))
             sys.exit(0)

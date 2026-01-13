@@ -4,12 +4,15 @@ Management command to serve Django with Cheroot (CherryPy's production-grade WSG
 Supports TLS and configurable threading. Suitable for production use.
 """
 
+import logging
 import os
 import sys
 
 from cheroot.wsgi import Server as WSGIServer
 from django.core.management.base import BaseCommand
 from django.core.wsgi import get_wsgi_application
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -79,6 +82,9 @@ class Command(BaseCommand):
         # Create and configure server
         server = WSGIServer((host, port), application, **server_kwargs)
 
+        logger.info(f"Starting Cheroot WSGI server on {protocol}://{host}:{port}/")
+        logger.info(f"Using {numthreads} threads")
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"Starting Cheroot WSGI server on {protocol}://{host}:{port}/"
@@ -90,6 +96,7 @@ class Command(BaseCommand):
         try:
             server.start()
         except KeyboardInterrupt:
+            logger.info("Shutting down server...")
             self.stdout.write(self.style.SUCCESS("\nShutting down server..."))
             server.stop()
             sys.exit(0)

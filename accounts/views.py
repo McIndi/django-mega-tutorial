@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
@@ -27,6 +29,8 @@ from .forms import (
 )
 from .models import CustomUser
 
+logger = logging.getLogger(__name__)
+
 
 def login_view(request):
     if request.method == "POST":
@@ -34,8 +38,17 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
+            logger.info(
+                f"User logged in: {user.username}",
+                extra={"user_id": user.id, "username": user.username},
+            )
             messages.success(request, f"Welcome back, {user.username}!")
             return redirect("profile")
+        else:
+            logger.warning(
+                f"Failed login attempt for username: {request.POST.get('username', 'unknown')}",
+                extra={"errors": form.errors.as_data()},
+            )
     else:
         form = CustomAuthenticationForm()
     return render(request, "accounts/login.html", {"form": form})
@@ -44,15 +57,25 @@ def login_view(request):
 @login_required
 def logout_view(request):
     if request.method == "POST":
+        username = request.user.username
+        user_id = request.user.id
         logout(request)
+        logger.info(
+            f"User logged out: {username}",
+            extra={"user_id": user_id, "username": username},
+        )
         messages.info(request, "You have been logged out.")
-        return redirect("index")
+        return redirect("core:index")
     else:
         return HttpResponseNotAllowed(["POST"])
 
 
 @login_required
 def profile_view(request):
+    logger.debug(
+        f"Profile accessed by {request.user.username}",
+        extra={"user_id": request.user.id},
+    )
     return render(request, "accounts/profile.html", {"user": request.user})
 
 
@@ -85,5 +108,16 @@ class RegisterView(CreateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
+        logger.info(
+            f"New user registered: {self.object.username} ({self.object.email})",
+            extra={"user_id": self.object.id, "username": self.object.username},
+        )
         messages.success(self.request, "Account created successfully! Please log in.")
         return response
+
+    def form_invalid(self, form):
+        logger.warning(
+            f"Registration form invalid: {form.errors.as_json()}",
+            extra={"errors": form.errors.as_data()},
+        )
+        return super().form_invalid(form)

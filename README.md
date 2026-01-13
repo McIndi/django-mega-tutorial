@@ -109,6 +109,9 @@ copy .env.example .env  # Windows
 # Run migrations
 python manage.py migrate
 
+# Collect static files
+python manage.py collectstatic --noinput
+
 # Create superuser
 python manage.py createsuperuser
 ```

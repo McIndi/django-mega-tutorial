@@ -7,3 +7,5 @@ tree.py
 db.sqlite3
 .DS_Store
 django.log*
+staticfiles/
+media/

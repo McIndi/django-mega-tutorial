@@ -1,9 +1,11 @@
+import logging
 import os
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
+from django.conf import settings
 from django.core.management import call_command
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 
@@ -13,7 +15,7 @@ class CoreViewsTest(TestCase):
 
     def test_index_view(self):
         """Test the index view renders correctly."""
-        response = self.client.get(reverse("index"))
+        response = self.client.get(reverse("core:index"))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "core/index.html")
 
@@ -246,3 +248,139 @@ class ServeAsyncCommandTests(TestCase):
         # Should not have ssl_certfile or ssl_keyfile if only one is provided
         self.assertIsNone(call_args[1].get("ssl_certfile"))
         self.assertIsNone(call_args[1].get("ssl_keyfile"))
+
+
+class StaticFilesTests(TestCase):
+    """Tests for static file serving with WhiteNoise."""
+
+    @override_settings(DEBUG=False)
+    def test_static_files_served_in_production(self):
+        """Test that static files are served when DEBUG=False."""
+        # WhiteNoise should serve static files even with DEBUG=False
+        # Django's admin ships with static files we can test against
+        response = self.client.get("/static/admin/css/base.css")
+        self.assertEqual(response.status_code, 200)
+        # WhiteNoiseFileResponse has streaming_content, not content
+        if hasattr(response, "streaming_content"):
+            content = b"".join(response.streaming_content)
+        else:
+            content = response.content
+        # Check for "DJANGO" (case insensitive) in the content
+        self.assertIn(b"DJANGO", content.upper())
+
+    @override_settings(DEBUG=False)
+    def test_static_files_have_cache_headers(self):
+        """Test that static files include caching headers."""
+        response = self.client.get("/static/admin/css/base.css")
+        self.assertEqual(response.status_code, 200)
+        # WhiteNoise should add cache-control headers
+        self.assertIn("Cache-Control", response.headers)
+
+    def test_staticfiles_dirs_configured(self):
+        """Test that STATICFILES_DIRS is properly configured."""
+        # Ensure we have a static directory configured
+        self.assertTrue(hasattr(settings, "STATICFILES_DIRS"))
+        self.assertIsInstance(settings.STATICFILES_DIRS, list)
+
+
+class LoggingTests(TestCase):
+    """Tests for logging configuration."""
+
+    def test_logging_configured(self):
+        """Test that logging is properly configured."""
+        self.assertIn("LOGGING", dir(settings))
+        self.assertIsInstance(settings.LOGGING, dict)
+        self.assertIn("version", settings.LOGGING)
+
+    def test_logger_output_format(self):
+        """Test that log messages include timestamp and level."""
+        logger = logging.getLogger("django")
+
+        # Capture log output
+        with self.assertLogs("django", level="INFO") as cm:
+            logger.info("Test log message")
+
+        # Verify log output contains expected format
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn("INFO", cm.output[0])
+        self.assertIn("Test log message", cm.output[0])
+
+    def test_app_loggers_exist(self):
+        """Test that application loggers can be instantiated."""
+        # These should not raise errors
+        accounts_logger = logging.getLogger("accounts")
+        links_logger = logging.getLogger("links")
+        core_logger = logging.getLogger("core")
+
+        self.assertIsNotNone(accounts_logger)
+        self.assertIsNotNone(links_logger)
+        self.assertIsNotNone(core_logger)
+
+
+@override_settings(DEBUG=False)
+class ErrorPageTests(TestCase):
+    """Tests for custom error pages."""
+
+    def test_404_page_uses_custom_template(self):
+        """Test that 404 errors render the custom template."""
+        response = self.client.get("/this-page-does-not-exist/")
+        self.assertEqual(response.status_code, 404)
+        self.assertTemplateUsed(response, "404.html")
+        self.assertContains(response, "Page Not Found", status_code=404)
+
+    def test_404_page_extends_base_template(self):
+        """Test that 404 page uses the site layout."""
+        response = self.client.get("/this-page-does-not-exist/")
+        self.assertEqual(response.status_code, 404)
+        # Check for elements from base.html
+        self.assertContains(response, "My SaaS App", status_code=404)
+
+    def test_500_page_uses_custom_template(self):
+        """Test that 500 errors render the custom template."""
+        # We can't easily trigger a real 500 in tests, so we'll check the view directly
+        from django.views.defaults import server_error
+        from django.test import RequestFactory
+
+        factory = RequestFactory()
+        request = factory.get("/")
+
+        # Test the error view directly
+        response = server_error(request, template_name="500.html")
+        self.assertEqual(response.status_code, 500)
+        self.assertIn(b"Server Error", response.content)
+
+
+class HealthCheckTests(TestCase):
+    """Tests for the health check endpoint."""
+
+    def test_health_check_returns_200(self):
+        """Test that health check endpoint returns 200 OK."""
+        response = self.client.get("/health/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_health_check_json_response(self):
+        """Test that health check returns JSON with status."""
+        response = self.client.get("/health/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+
+        data = response.json()
+        self.assertIn("status", data)
+        self.assertEqual(data["status"], "healthy")
+
+    def test_health_check_includes_database_status(self):
+        """Test that health check verifies database connectivity."""
+        response = self.client.get("/health/")
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn("database", data)
+        self.assertEqual(data["database"], "connected")
+
+    def test_health_check_does_not_require_authentication(self):
+        """Test that health check is accessible without login."""
+        # Clear any existing session
+        self.client.logout()
+
+        response = self.client.get("/health/")
+        self.assertEqual(response.status_code, 200)

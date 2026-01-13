@@ -18,7 +18,7 @@
             </div>
         </div>
         <div class="mt-3">
-            <a href="{% url 'index' %}" class="btn btn-secondary">Back to Home</a>
+            <a href="{% url 'core:index' %}" class="btn btn-secondary">Back to Home</a>
             <form method="post" action="{% url 'logout' %}" style="display: inline;">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-danger ms-2">Logout</button>

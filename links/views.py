@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404
@@ -16,6 +18,8 @@ from django.views.generic import (
 from .forms import LinkForm
 from .models import Click, Link
 
+logger = logging.getLogger(__name__)
+
 
 class LinkListView(LoginRequiredMixin, ListView):
     model = Link
@@ -23,6 +27,10 @@ class LinkListView(LoginRequiredMixin, ListView):
     context_object_name = "links"
 
     def get_queryset(self):
+        logger.debug(
+            f"Fetching links for user {self.request.user.username}",
+            extra={"user_id": self.request.user.id},
+        )
         return Link.objects.filter(user=self.request.user)
 
 
@@ -44,6 +52,11 @@ class LinkDetailView(LoginRequiredMixin, DetailView):
         # Aggregate click statistics
         clicks = link.clicks.all()
         context["total_clicks"] = clicks.count()
+
+        logger.debug(
+            f"Link detail viewed: {link.public_path} ({context['total_clicks']} clicks)",
+            extra={"link_id": link.id, "user_id": self.request.user.id},
+        )
 
         # Top referrers
         referrer_stats = (
@@ -82,7 +95,16 @@ class LinkCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.user = self.request.user
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        logger.info(
+            f"Link created: {self.object.public_path} -> {self.object.target_url}",
+            extra={
+                "user_id": self.request.user.id,
+                "link_id": self.object.id,
+                "slug": self.object.slug,
+            },
+        )
+        return response
 
 
 class LinkUpdateView(LoginRequiredMixin, UpdateView):
@@ -99,6 +121,14 @@ class LinkUpdateView(LoginRequiredMixin, UpdateView):
         kwargs["user"] = self.request.user
         return kwargs
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        logger.info(
+            f"Link updated: {self.object.public_path}",
+            extra={"link_id": self.object.id, "user_id": self.request.user.id},
+        )
+        return response
+
 
 class LinkDeleteView(LoginRequiredMixin, DeleteView):
     model = Link
@@ -108,6 +138,14 @@ class LinkDeleteView(LoginRequiredMixin, DeleteView):
     def get_queryset(self):
         return Link.objects.filter(user=self.request.user)
 
+    def delete(self, request, *args, **kwargs):
+        link = self.get_object()
+        logger.info(
+            f"Link deleted: {link.public_path}",
+            extra={"link_id": link.id, "user_id": request.user.id},
+        )
+        return super().delete(request, *args, **kwargs)
+
 
 class LinkPublicRedirectView(View):
     def get(self, request, username, slug):
@@ -116,6 +154,10 @@ class LinkPublicRedirectView(View):
             user = User.objects.get(username=username)
             link = Link.objects.get(user=user, slug=slug)
         except (User.DoesNotExist, Link.DoesNotExist):
+            logger.warning(
+                f"Link not found: /{username}/{slug}/",
+                extra={"username": username, "slug": slug},
+            )
             raise Http404()
 
         Click.objects.create(
@@ -123,6 +165,16 @@ class LinkPublicRedirectView(View):
             referrer=request.META.get("HTTP_REFERER", ""),
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
             ip_address=self._get_client_ip(request),
+        )
+
+        logger.info(
+            f"Link redirect: {link.public_path} -> {link.target_url}",
+            extra={
+                "link_id": link.id,
+                "slug": slug,
+                "target": link.target_url,
+                "ip": self._get_client_ip(request),
+            },
         )
 
         return redirect(link.target_url)

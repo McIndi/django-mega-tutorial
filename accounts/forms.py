@@ -1,3 +1,5 @@
+import logging
+
 from django import forms
 from django.contrib.auth.forms import (
     UserCreationForm,
@@ -6,6 +8,8 @@ from django.contrib.auth.forms import (
     SetPasswordForm,
 )
 from django.contrib.auth import get_user_model
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -42,6 +46,10 @@ class CustomUserCreationForm(UserCreationForm):
         user.email = self.cleaned_data["email"]
         if commit:
             user.save()
+            logger.debug(
+                f"User created via form: {user.username}",
+                extra={"username": user.username, "email": user.email},
+            )
         return user
 
 
