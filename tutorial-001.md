@@ -1,11 +1,7 @@
-# Building a Django SaaS App Template
+# Building a Django SaaS App
 Or The Django SaaS Mega-Tutorial
 
 ## From Scratch to Subscription-Ready (Part 1)
-
-**Published December 30, 2025**
-*By Cliff*
-
 ---
 
 ## TL;DR
