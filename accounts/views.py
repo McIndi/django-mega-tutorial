@@ -113,12 +113,17 @@ class RegisterView(CreateView):
             "New user registered",
             extra={"user_id": self.object.id},
         )
-        send_templated_email(
-            subject="Welcome to Django SaaS",
-            template_base="emails/welcome_email",
-            context={"user": self.object, "login_url": reverse("login")},
-            to=[self.object.email],
-        )
+        # Use absolute URL in emails and avoid breaking registration on send failure
+        try:
+            login_url = self.request.build_absolute_uri(reverse("login"))
+            send_templated_email(
+                subject="Welcome to Django SaaS",
+                template_base="emails/welcome_email",
+                context={"user": self.object, "login_url": login_url},
+                to=[self.object.email],
+            )
+        except Exception as e:
+            logger.error(f"Failed to send welcome email: {e}", exc_info=True)
         messages.success(self.request, "Account created successfully! Please log in.")
         return response
 
