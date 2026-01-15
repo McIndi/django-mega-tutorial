@@ -240,6 +240,8 @@ EMAIL_HOST_USER = env("DJANGO_EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("DJANGO_EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_SSL = env.bool("DJANGO_EMAIL_USE_SSL", default=False)
 EMAIL_USE_TLS = env.bool("DJANGO_EMAIL_USE_TLS", default=not EMAIL_USE_SSL)
+EMAIL_SUBJECT_PREFIX = env("DJANGO_EMAIL_SUBJECT_PREFIX", default="")
+
 EMAIL_TIMEOUT = env.int("DJANGO_EMAIL_TIMEOUT", default=10)
 DEFAULT_FROM_EMAIL = env("DJANGO_DEFAULT_FROM_EMAIL", default="noreply@example.com")
 SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
@@ -290,6 +292,7 @@ DJANGO_EMAIL_USE_TLS=True
 DJANGO_EMAIL_USE_SSL=False
 DJANGO_EMAIL_TIMEOUT=10
 DJANGO_EMAIL_REPLY_TO=support@example.com
+DJANGO_EMAIL_SUBJECT_PREFIX="[Django SaaS] "
 
 # Admin error notifications (emails sent on 500 errors when DEBUG=False)
 # Format: "Name:email@example.com,Another Name:another@example.com"
@@ -579,15 +582,20 @@ class RegisterView(CreateView):
             "New user registered",
             extra={"user_id": self.object.id},
         )
-        send_templated_email(
-            subject="Welcome to Django SaaS",
-            template_base="emails/welcome_email",
-            context={"user": self.object, "login_url": reverse("login")},
-            to=[self.object.email],
-        )
+        # Use an absolute URL for emails and avoid breaking registration on failures
+        try:
+            login_url = self.request.build_absolute_uri(reverse("login"))
+            send_templated_email(
+                subject="Welcome to Django SaaS",
+                template_base="emails/welcome_email",
+                context={"user": self.object, "login_url": login_url},
+                to=[self.object.email],
+            )
+        except Exception as e:
+            logger.error(f"Failed to send welcome email: {e}", exc_info=True)
         messages.success(self.request, "Account created successfully! Please log in.")
         return response
-```
+    ```
 
 Verify test passes:
 

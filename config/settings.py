@@ -8,6 +8,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import logging
 import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -29,7 +30,7 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 if DEBUG:
-    print("WARNING: Django DEBUG mode is ON. This should be turned off in production!")
+    logging.warning("Django DEBUG mode is ON. This should be turned off in production!")
 else:
     # Production security headers
     SECURE_SSL_REDIRECT = True
@@ -71,6 +72,7 @@ EMAIL_TIMEOUT = env.int("DJANGO_EMAIL_TIMEOUT", default=10)
 DEFAULT_FROM_EMAIL = env("DJANGO_DEFAULT_FROM_EMAIL", default="noreply@example.com")
 SERVER_EMAIL = env("DJANGO_SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
 EMAIL_REPLY_TO = env.list("DJANGO_EMAIL_REPLY_TO", default=[])
+EMAIL_SUBJECT_PREFIX = env("DJANGO_EMAIL_SUBJECT_PREFIX", default="")
 
 # Admin email notifications for errors (500s)
 ADMINS = [
