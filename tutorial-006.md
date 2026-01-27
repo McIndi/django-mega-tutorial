@@ -595,7 +595,7 @@ class RegisterView(CreateView):
             logger.error(f"Failed to send welcome email: {e}", exc_info=True)
         messages.success(self.request, "Account created successfully! Please log in.")
         return response
-    ```
+```
 
 Verify test passes:
 

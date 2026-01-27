@@ -226,9 +226,6 @@ Edit `.github/workflows/ci.yml` to run collectstatic before tests:
 
 Add collectstatic to the setup instructions:
 
-```markdown
-### Initial Setup
-
 ```bash
 # Run migrations
 python manage.py migrate
@@ -242,7 +239,7 @@ python manage.py createsuperuser
 # Run the server
 python manage.py serve
 ```
-```
+
 
 ---
 
@@ -1091,7 +1088,7 @@ Your Django SaaS now has:
 3. **Set up monitoring**: Create alerts based on health check and log patterns
 4. **Load testing**: Verify WhiteNoise performance under load
 
-Future tutorials will cover:
+Future tutorials will cover (subject to change):
 
 - **Tutorial 006**: Email backend configuration and transactional emails
 - **Tutorial 007**: Background tasks with Celery
@@ -1107,8 +1104,3 @@ Future tutorials will cover:
 - [Django Logging Documentation](https://docs.djangoproject.com/en/stable/topics/logging/)
 - [Python Logging Levels](https://docs.python.org/3/library/logging.html#logging-levels)
 - [Django Error Views](https://docs.djangoproject.com/en/stable/ref/views/#error-views)
-
----
-
-**Published January 3, 2026**
-*By Cliff*

@@ -1083,7 +1083,7 @@ Ensure all tests still pass:
 python manage.py test
 ```
 
-You should see:
+You should see something like:
 
 ```
 Ran 65 tests in ~40s
