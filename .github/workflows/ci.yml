@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DJANGO_SECRET_KEY: ci-test-key
-      DJANGO_DEBUG: "False"
+      DJANGO_DEBUG: "True"
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
       DJANGO_SETTINGS_MODULE: config.settings
 
@@ -29,7 +29,7 @@ jobs:
       - name: Create .env for CI
         run: |
           echo "DJANGO_SECRET_KEY=ci-test-key" > .env
-          echo "DJANGO_DEBUG=False" >> .env
+          echo "DJANGO_DEBUG=True" >> .env
           echo "DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
 
       - name: Collect static files
