@@ -127,10 +127,10 @@ Visit [http://127.0.0.1:8000](http://127.0.0.1:8000) to see the application.
 
 ## Running with Docker
 
-To run the application with Docker and PostgreSQL:
+To run the application with Docker, PostgreSQL, Redis, and Celery:
 
 ```bash
-# Start services (database + web)
+# Start all services (database + web + Redis + Celery worker + Flower)
 docker-compose up -d
 
 # Run migrations
@@ -139,8 +139,11 @@ docker-compose exec web python manage.py migrate
 # Create superuser
 docker-compose exec web python manage.py createsuperuser
 
-# View logs
+# View logs from web service
 docker-compose logs -f web
+
+# View logs from Celery worker
+docker-compose logs -f celery_worker
 
 # Stop services
 docker-compose down
@@ -148,11 +151,61 @@ docker-compose down
 
 The application will be available at [http://localhost:8000](http://localhost:8000).
 
-See [Tutorial 004](tutorial-004.md) for detailed Docker setup and customization.
+### Monitoring Celery Tasks
+
+Flower (Celery task monitoring UI) is available at [http://localhost:5555](http://localhost:5555)
+
+### Services
+
+- **web** (port 8000): Django application
+- **db** (port 5432): PostgreSQL database
+- **redis** (port 6379): Redis broker and result backend
+- **celery_worker**: Async task processor
+- **flower** (port 5555): Task monitoring UI
+
+See [Tutorial 004](tutorial-004.md) for detailed Docker setup and [Tutorial 007](tutorial-007.md) for Celery configuration.
 
 **Podman tips:**
 - Use fully qualified images (e.g., `docker.io/postgres:18-alpine`) to avoid short-name resolution errors.
 - After changing the Dockerfile (such as copying the source before `pip install -e .`), run `podman-compose build --no-cache` so the builder sees the new context.
+
+## Celery (Async Tasks)
+
+### Local Development
+
+Start Celery worker in a separate terminal:
+
+```bash
+# Install Celery and Redis
+pip install -e ".[dev]"
+
+# Start the worker (processes email queue)
+celery -A config worker -Q email,celery -l info --concurrency=4
+
+# In another terminal, monitor with Flower
+celery -A config flower --port=5555
+# Open http://localhost:5555
+```
+
+### Configuration
+
+Celery is configured via environment variables:
+
+```bash
+# Broker and result backend
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/1
+
+# Task behavior
+CELERY_TASK_MAX_RETRIES=3
+CELERY_TASK_DEFAULT_RETRY_DELAY=60
+
+# Worker tuning
+CELERY_PREFETCH_MULTIPLIER=4
+CELERY_MAX_TASKS_PER_CHILD=1000
+```
+
+See [Tutorial 007](tutorial-007.md) for comprehensive Celery guide.
 
 ## Testing
 
@@ -376,7 +429,16 @@ This project is built following a comprehensive tutorial series:
    - Admin error notifications
    - Test email command
 
-7. **More tutorials coming soon** - Topics will include subscription billing, background tasks, Let's Encrypt integration, and production monitoring
+7. **[Tutorial 007](tutorial-007.md)** - Asynchronous Task Processing with Celery
+   - Celery with Redis broker
+   - Email tasks with automatic retry logic
+   - Flower UI for task monitoring
+   - Custom logging for workers
+   - Docker Compose with Celery services
+   - Health check integration
+   - Production monitoring and troubleshooting
+
+8. **More tutorials coming soon** - Topics will include webhook processing, scheduled jobs, subscription billing, and production monitoring
 
 ## Why Django for SaaS?
 

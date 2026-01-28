@@ -15,12 +15,15 @@ dependencies = [
     "django",
     "django-environ",
     "whitenoise",
+    "celery",
+    "redis",
 ]
 
 [project.optional-dependencies]
 cheroot = ["cheroot"]
 daphne = ["daphne"]
 postgres = ["psycopg2-binary"]
+flower = ["flower"]
 dev = [
     "black",
     "mypy",
@@ -29,6 +32,9 @@ dev = [
     "pre-commit",
     "coverage",
     "psycopg2-binary",
+    "celery",
+    "redis",
+    "flower",
 ]
 servers = ["cheroot", "daphne", "psycopg2-binary"]
 all = [
@@ -41,6 +47,9 @@ all = [
     "cheroot",
     "daphne",
     "psycopg2-binary",
+    "celery",
+    "redis",
+    "flower",
 ]
 
 [tool.black]

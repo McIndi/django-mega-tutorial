@@ -8,6 +8,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 import logging
 import environ
 
@@ -227,6 +228,10 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Ensure logs directory exists
+LOGS_DIR = BASE_DIR / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
 # Logging
 LOGGING = {
     "version": 1,
@@ -240,11 +245,58 @@ LOGGING = {
             "format": "{levelname} {message}",
             "style": "{",
         },
+        "celery": {
+            "format": "[{levelname}] {asctime} {name} - {message}",
+            "style": "{",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
+        },
+        # Celery Worker File Logging
+        # ⚠️ MULTIPROCESS LOGGING CAVEAT:
+        # RotatingFileHandler is thread-safe but NOT multiprocess-safe.
+        # Multiple Celery worker processes writing to the same rotating file can cause:
+        #   - Garbled/interleaved log output
+        #   - ROTATION CORRUPTION: race conditions during rollover (the main risk)
+        #   - Lost log lines when rename/rotate happens while other processes write
+        #
+        # SAFER PRODUCTION ALTERNATIVES:
+        # 1. Log to stdout/stderr → let systemd/journald/Docker/supervisord handle it (RECOMMENDED)
+        # 2. External rotation: Use non-rotating handler + logrotate (copytruncate mode)
+        # 3. Per-worker files: f"celery_worker_{os.getpid()}.log" (many files to manage)
+        # 4. Multiprocess-safe handler: pip install concurrent-log-handler
+        # 5. QueueHandler + QueueListener: centralized writer thread in your app
+        # 6. Syslog/external service: Sentry, DataDog, CloudWatch, syslog
+        #
+        # CURRENT SETUP: Using RotatingFileHandler with per-worker files for development/small deployments.
+        # Acceptable for dev/testing/light production, but REPLACE with another option from the list above
+        # for high throughput.
+        #
+        # OPTIMIZATION: delay=True means the log file is NOT created until the first log record is written.
+        # Since we only log ERRORs (level="ERROR"), a worker that never encounters errors will never create
+        # a log file. This prevents cluttering logs/ with empty files from successful workers.
+        "celery_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOGS_DIR / f"celery_worker-{os.getpid()}.log",
+            "formatter": "celery",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "level": env("CELERY_LOG_LEVEL", default="ERROR"),
+            "delay": True,  # Only create file when first error occurs
+        },
+        "celery_error_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOGS_DIR / f"celery_errors-{os.getpid()}.log",
+            "formatter": "celery",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 10,
+            "level": "ERROR",
+            "delay": True,  # Only create file when first error occurs
+            # ⚠️ Same multiprocess rotation corruption risk as celery_file above
         },
     },
     "root": {
@@ -272,5 +324,68 @@ LOGGING = {
             "level": env("DJANGO_LOG_LEVEL", default="INFO"),
             "propagate": False,
         },
+        "celery": {
+            "handlers": ["console", "celery_file", "celery_error_file"],
+            "level": env("CELERY_LOG_LEVEL", default="ERROR"),
+            "propagate": False,
+        },
+        "celery.task": {
+            "handlers": ["console", "celery_file"],
+            "level": env("CELERY_TASK_LOG_LEVEL", default="ERROR"),
+            "propagate": False,
+        },
     },
 }
+
+
+# Celery Configuration
+# https://docs.celeryproject.io/en/stable/django/
+
+CELERY_BROKER_URL = env(
+    "CELERY_BROKER_URL",
+    default="redis://localhost:6379/0" if not DEBUG else "memory://",
+)
+CELERY_RESULT_BACKEND = env(
+    "CELERY_RESULT_BACKEND",
+    default="redis://localhost:6379/1" if not DEBUG else "cache+memory://",
+)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# In test environment, execute tasks synchronously and eagerly
+if "test" in sys.argv or env.bool("CELERY_ALWAYS_EAGER", default=False):
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+
+# Task routing and scheduling
+CELERY_TASK_ROUTES = {
+    "core.tasks.send_welcome_email": {"queue": "email"},
+    "core.tasks.send_password_reset_email": {"queue": "email"},
+    "core.tasks.cleanup_expired_tokens": {"queue": "celery"},
+}
+
+CELERY_QUEUES = {
+    "email": {
+        "exchange": "email",
+        "routing_key": "email",
+    },
+    "celery": {
+        "exchange": "celery",
+        "routing_key": "celery",
+    },
+}
+
+# Celery worker configuration
+CELERYD_PREFETCH_MULTIPLIER = env.int("CELERY_PREFETCH_MULTIPLIER", default=4)
+CELERYD_MAX_TASKS_PER_CHILD = env.int("CELERY_MAX_TASKS_PER_CHILD", default=1000)
+CELERYD_TASK_SOFT_TIME_LIMIT = env.int("CELERY_TASK_SOFT_TIME_LIMIT", default=25 * 60)
+CELERYD_TASK_TIME_LIMIT = env.int("CELERY_TASK_TIME_LIMIT", default=30 * 60)
+
+# Task retry configuration
+CELERY_TASK_MAX_RETRIES = env.int("CELERY_TASK_MAX_RETRIES", default=3)
+CELERY_TASK_DEFAULT_RETRY_DELAY = env.int("CELERY_TASK_DEFAULT_RETRY_DELAY", default=60)

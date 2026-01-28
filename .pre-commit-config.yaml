@@ -13,6 +13,7 @@ repos:
           - django-stubs
           - django
           - django-environ
+          - celery
         args: ['--ignore-missing-imports']
         exclude: 'migrations/'
 

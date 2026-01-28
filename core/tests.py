@@ -1,12 +1,15 @@
 import logging
 import os
+from datetime import timedelta
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
+from django.contrib.sessions.models import Session
 from django.core.management import call_command
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 
 class CoreViewsTest(TestCase):
@@ -385,3 +388,52 @@ class HealthCheckTests(TestCase):
 
         response = self.client.get("/health/")
         self.assertEqual(response.status_code, 200)
+
+
+class CeleryTaskTests(TestCase):
+    """Tests for Celery tasks."""
+
+    def test_cleanup_expired_tokens_task_executes(self):
+        """Test that cleanup_expired_tokens task executes without errors."""
+        from core.tasks import cleanup_expired_tokens
+
+        # Call task with CELERY_ALWAYS_EAGER mode (synchronous execution in tests)
+        result = cleanup_expired_tokens.delay()
+        # Task should complete successfully
+        self.assertTrue(result.successful())
+
+    def test_cleanup_expired_tokens_deletes_expired_sessions(self):
+        """Test that cleanup_expired_tokens deletes expired sessions from database."""
+        from core.tasks import cleanup_expired_tokens
+
+        now = timezone.now()
+
+        # Create an expired session (1 day in the past)
+        expired_session = Session.objects.create(
+            session_key="expired_session_key_123",
+            expire_date=now - timedelta(days=1),
+            session_data="test_data",
+        )
+
+        # Create a valid session (1 day in the future)
+        valid_session = Session.objects.create(
+            session_key="valid_session_key_456",
+            expire_date=now + timedelta(days=1),
+            session_data="test_data",
+        )
+
+        # Verify both sessions exist
+        self.assertEqual(Session.objects.count(), 2)
+
+        # Run cleanup task
+        result = cleanup_expired_tokens.delay()
+
+        # Verify expired session was deleted
+        self.assertFalse(Session.objects.filter(pk=expired_session.pk).exists())
+
+        # Verify valid session still exists
+        self.assertTrue(Session.objects.filter(pk=valid_session.pk).exists())
+        self.assertEqual(Session.objects.count(), 1)
+
+        # Check return message
+        self.assertIn("1 expired sessions deleted", result.result)

@@ -17,6 +17,18 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis broker and result backend service
+  redis:
+    image: docker.io/redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # Django web application service
   web:
     build: .
@@ -35,6 +47,12 @@ services:
       DATABASE_HOST: db
       DATABASE_PORT: ${DB_PORT:-5432}
 
+      # Celery configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_PREFETCH_MULTIPLIER: 4
+      CELERY_MAX_TASKS_PER_CHILD: 1000
+
       # Server configuration
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: ${SERVER_PORT:-8000}
@@ -46,12 +64,69 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       # Mount source code for development (optional; comment out for production)
       - .:/app
     # Restart policy
     restart: unless-stopped
 
+  # Celery worker service (email queue)
+  celery_worker:
+    build: .
+    command: celery -A config worker -Q email,celery -l info --concurrency=4
+    environment:
+      # Django settings
+      DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+
+      # Database configuration (PostgreSQL via docker-compose)
+      DATABASE_ENGINE: postgresql
+      DATABASE_NAME: ${DB_NAME:-django_saas}
+      DATABASE_USER: ${DB_USER:-postgres}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-postgres}
+      DATABASE_HOST: db
+      DATABASE_PORT: ${DB_PORT:-5432}
+
+      # Celery configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CELERY_PREFETCH_MULTIPLIER: 4
+      CELERY_MAX_TASKS_PER_CHILD: 1000
+
+      # Logging
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount source code and logs directory
+      - .:/app
+      - celery_logs:/app/logs
+    # Restart policy
+    restart: unless-stopped
+
+  # Flower monitoring service (Celery task monitoring UI)
+  flower:
+    build: .
+    command: celery -A config flower --port=5555 --broker=redis://redis:6379/0 --persistent=False
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    ports:
+      - "${FLOWER_PORT:-5555}:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   # Named volume for PostgreSQL data persistence
   postgres_data:
+  # Named volume for Celery worker logs
+  celery_logs:

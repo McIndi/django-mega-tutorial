@@ -21,7 +21,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from core.email import send_templated_email
+from core.tasks import send_welcome_email
 from .forms import (
     CustomUserCreationForm,
     CustomAuthenticationForm,
@@ -113,17 +113,20 @@ class RegisterView(CreateView):
             "New user registered",
             extra={"user_id": self.object.id},
         )
-        # Use absolute URL in emails and avoid breaking registration on send failure
+        # Send welcome email asynchronously via Celery
         try:
             login_url = self.request.build_absolute_uri(reverse("login"))
-            send_templated_email(
-                subject="Welcome to Django SaaS",
-                template_base="emails/welcome_email",
-                context={"user": self.object, "login_url": login_url},
-                to=[self.object.email],
+            send_welcome_email.delay(user_id=self.object.id, login_url=login_url)
+            logger.info(
+                "Welcome email task queued",
+                extra={"user_id": self.object.id},
             )
         except Exception as e:
-            logger.error(f"Failed to send welcome email: {e}", exc_info=True)
+            logger.error(
+                f"Failed to queue welcome email: {e}",
+                exc_info=True,
+                extra={"user_id": self.object.id},
+            )
         messages.success(self.request, "Account created successfully! Please log in.")
         return response
 

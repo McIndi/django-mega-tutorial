@@ -8,6 +8,12 @@ from django.contrib.auth.forms import (
     SetPasswordForm,
 )
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
+
+from core.tasks import send_password_reset_email
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +77,54 @@ class CustomPasswordResetForm(PasswordResetForm):
         self.fields["email"].widget.attrs.update(
             {"class": "form-control", "placeholder": "Enter your email"}
         )
+
+    def save(
+        self,
+        domain_override=None,
+        subject_template_name=None,
+        email_template_name=None,
+        use_https=False,
+        token_generator=default_token_generator,
+        from_email=None,
+        request=None,
+        html_email_template_name=None,
+        extra_email_context=None,
+    ):
+        """Queue password reset emails via Celery instead of sending inline."""
+        email = self.cleaned_data["email"]
+        protocol = "https" if use_https else "http"
+
+        for user in self.get_users(email):
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = token_generator.make_token(user)
+            path = reverse(
+                "password_reset_confirm",
+                kwargs={"uidb64": uid, "token": token},
+            )
+
+            if request is not None:
+                reset_link = request.build_absolute_uri(path)
+            else:
+                domain = domain_override
+                if not domain:
+                    domain = "localhost"
+                reset_link = f"{protocol}://{domain}{path}"
+
+            try:
+                send_password_reset_email.delay(
+                    user_id=user.id,
+                    reset_link=reset_link,
+                )
+                logger.info(
+                    "Password reset email task queued",
+                    extra={"user_id": user.id},
+                )
+            except Exception:
+                logger.error(
+                    "Failed to queue password reset email",
+                    exc_info=True,
+                    extra={"user_id": user.id},
+                )
 
 
 class CustomSetPasswordForm(SetPasswordForm):

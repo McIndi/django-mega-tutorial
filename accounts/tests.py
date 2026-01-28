@@ -540,3 +540,101 @@ class IntegrationFlowTests(TestCase):
             },
         )
         self.assertRedirects(confirm_response, reverse("password_reset_complete"))
+
+
+class EmailTaskTests(TestCase):
+    """Tests for Celery email tasks."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            password="testpassword123",
+        )
+
+    def test_send_welcome_email_task_executes(self):
+        """Test that send_welcome_email task executes without errors."""
+        from core.tasks import send_welcome_email
+
+        # Call task with CELERY_ALWAYS_EAGER mode (synchronous execution in tests)
+        result = send_welcome_email.delay(
+            user_id=self.user.id,
+            login_url="http://localhost:8000/accounts/login/",
+        )
+        # Task should complete successfully
+        self.assertTrue(result.successful())
+
+    def test_send_welcome_email_task_sends_email(self):
+        """Test that send_welcome_email task actually sends an email."""
+        from core.tasks import send_welcome_email
+
+        # Reset mailbox
+        mail.outbox = []
+
+        # Call task
+        send_welcome_email.delay(
+            user_id=self.user.id,
+            login_url="http://localhost:8000/accounts/login/",
+        )
+
+        # Verify email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(email.to[0], self.user.email)
+        self.assertIn("Welcome", email.subject)
+
+    def test_send_welcome_email_task_with_invalid_user(self):
+        """Test that send_welcome_email task handles invalid user gracefully."""
+        from core.tasks import send_welcome_email
+
+        # Call task with non-existent user ID
+        result = send_welcome_email.delay(
+            user_id=99999,
+            login_url="http://localhost:8000/accounts/login/",
+        )
+        # Task should not raise exception (handled gracefully)
+        self.assertTrue(result.successful())
+
+    def test_send_password_reset_email_task_executes(self):
+        """Test that send_password_reset_email task executes without errors."""
+        from core.tasks import send_password_reset_email
+
+        reset_token = "test-token-12345"
+
+        result = send_password_reset_email.delay(
+            user_id=self.user.id,
+            reset_link="http://localhost:8000/accounts/password-reset-confirm/test-token/",
+        )
+        # Task should complete successfully
+        self.assertTrue(result.successful())
+
+    def test_send_password_reset_email_task_sends_email(self):
+        """Test that send_password_reset_email task actually sends an email."""
+        from core.tasks import send_password_reset_email
+
+        # Reset mailbox
+        mail.outbox = []
+
+        # Call task
+        send_password_reset_email.delay(
+            user_id=self.user.id,
+            reset_link="http://localhost:8000/accounts/password-reset-confirm/test-token/",
+        )
+
+        # Verify email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(email.to[0], self.user.email)
+        self.assertIn("Password Reset", email.subject)
+
+    def test_send_password_reset_email_task_with_invalid_user(self):
+        """Test that send_password_reset_email task handles invalid user gracefully."""
+        from core.tasks import send_password_reset_email
+
+        # Call task with non-existent user ID
+        result = send_password_reset_email.delay(
+            user_id=99999,
+            reset_link="http://localhost:8000/accounts/password-reset-confirm/test-token/",
+        )
+        # Task should not raise exception (handled gracefully)
+        self.assertTrue(result.successful())
