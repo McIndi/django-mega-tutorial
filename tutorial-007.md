@@ -681,35 +681,106 @@ docker-compose logs -f celery_worker
 docker-compose down
 ```
 
-### Manual Celery Commands (Local Development)
+### Manual Commands Without Docker
 
-**Start Worker:**
+If you prefer to run Redis, Celery, and Flower manually (without docker-compose), follow these steps:
+
+#### 1. Start Redis Server
+
+**Windows:**
+```bash
+# If using Windows Subsystem for Linux (WSL):
+wsl redis-server
+
+# Or using Windows Redis (if installed):
+redis-server.exe
+```
+
+**macOS (with Homebrew):**
+```bash
+# Start Redis
+redis-server
+
+# Or run in background
+brew services start redis
+```
+
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo systemctl start redis-server
+
+# Or run directly
+redis-server
+```
+
+**Verify Redis is running:**
+```bash
+# In another terminal
+redis-cli ping
+# Should output: PONG
+```
+
+#### 2. Start Celery Worker
+
+**In a new terminal (with virtual environment activated):**
 
 ```bash
 # Process email queue only, 4 concurrent processes, info level
 celery -A config worker -Q email -l info --concurrency=4
 
-# Process multiple queues
+# Or process multiple queues
 celery -A config worker -Q email,celery -l info --concurrency=4
 
-# Single process (debugging)
+# For debugging (single process, verbose logging)
 celery -A config worker -l debug --concurrency=1 --without-gossip
 ```
 
-**Monitor with Flower:**
+#### 3. Monitor with Flower
+
+**In another new terminal (with virtual environment activated):**
 
 ```bash
+# Start Flower (monitoring UI)
 celery -A config flower --port=5555
-# Open http://localhost:5555
+
+# Open http://localhost:5555 in your browser
 ```
 
-**Send Test Task:**
+#### 4. Send Test Task
+
+**Test that everything is working:**
 
 ```bash
 python manage.py shell
 >>> from core.tasks import send_welcome_email
 >>> send_welcome_email.delay(user_id=1, login_url="http://localhost:8000/accounts/login/")
 # <AsyncResult: e1234567-abcd-1234-abcd-1234567890ab>
+
+# Check the worker terminal - you should see the task being processed
+```
+
+#### Quick Reference: Terminal Setup
+
+For convenient manual testing, open 4 terminals:
+
+```
+Terminal 1: python manage.py runserver
+Terminal 2: celery -A config worker -Q email,celery -l info
+Terminal 3: celery -A config flower --port=5555
+Terminal 4: redis-cli  # (optional, for inspecting Redis)
+```
+
+**Useful Redis commands (in Terminal 4):**
+```bash
+redis-cli
+> PING          # Test connection
+> KEYS *        # List all keys
+> DBSIZE        # Number of keys
+> SELECT 0      # Switch to broker DB (tasks)
+> SELECT 1      # Switch to result backend DB (task results)
+> FLUSHALL      # Clear all data (careful!)
+> QUIT          # Exit redis-cli
 ```
 
 ---
@@ -1817,8 +1888,9 @@ def rate_limited_task():
 ✅ **Celery architecture**: Broker, worker, result backend, monitoring
 ✅ **Configuration**: Redis, queues, retry logic, timeouts
 ✅ **Email tasks**: Welcome and password reset as async operations
-✅ **Logging**: Separate worker logs at ERROR level only
+✅ **Custom logging**: Per-worker files with `delay=True` (files only created on errors)
 ✅ **Docker Compose**: Redis, Celery worker, Flower services
+✅ **Manual setup**: Run Celery/Flower/Redis without Docker
 ✅ **Monitoring**: Flower UI + health check integration
 ✅ **Production hardening**: Timeouts, concurrency, prefetch, dead letters
 ✅ **Troubleshooting**: Common issues and solutions

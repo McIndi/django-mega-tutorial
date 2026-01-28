@@ -171,9 +171,52 @@ See [Tutorial 004](tutorial-004.md) for detailed Docker setup and [Tutorial 007]
 
 ## Celery (Async Tasks)
 
-### Local Development
+### Docker Setup
 
-Start Celery worker in a separate terminal:
+To run the application with Docker, PostgreSQL, Redis, and Celery:
+
+```bash
+# Start all services (database + web + Redis + Celery worker + Flower)
+docker-compose up -d
+
+# Run migrations
+docker-compose exec web python manage.py migrate
+
+# Create superuser
+docker-compose exec web python manage.py createsuperuser
+
+# View logs from web service
+docker-compose logs -f web
+
+# View logs from Celery worker
+docker-compose logs -f celery_worker
+
+# Stop services
+docker-compose down
+```
+
+### Manual Setup (Without Docker)
+
+If you prefer to run Redis and Celery manually:
+
+**Terminal 1: Start Redis**
+
+```bash
+# Windows (WSL):
+wsl redis-server
+
+# macOS (Homebrew):
+redis-server
+
+# Linux:
+redis-server
+
+# Verify it's running (in another terminal):
+redis-cli ping
+# Should output: PONG
+```
+
+**Terminal 2: Start Celery Worker**
 
 ```bash
 # Install Celery and Redis
@@ -181,10 +224,21 @@ pip install -e ".[dev]"
 
 # Start the worker (processes email queue)
 celery -A config worker -Q email,celery -l info --concurrency=4
+```
 
-# In another terminal, monitor with Flower
+**Terminal 3: Monitor with Flower**
+
+```bash
+# Start Flower UI
 celery -A config flower --port=5555
 # Open http://localhost:5555
+```
+
+**Terminal 4: Run Django Server**
+
+```bash
+python manage.py serve
+# Visit http://127.0.0.1:8000
 ```
 
 ### Configuration
@@ -205,7 +259,7 @@ CELERY_PREFETCH_MULTIPLIER=4
 CELERY_MAX_TASKS_PER_CHILD=1000
 ```
 
-See [Tutorial 007](tutorial-007.md) for comprehensive Celery guide.
+See [Tutorial 007](tutorial-007.md) for comprehensive Celery guide, including production-ready logging strategies and troubleshooting.
 
 ## Testing
 
