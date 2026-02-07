@@ -68,7 +68,7 @@ services:
         condition: service_healthy
     volumes:
       # Mount source code for development (optional; comment out for production)
-      - .:/app
+      - .:/app:Z
     # Restart policy
     restart: unless-stopped
 

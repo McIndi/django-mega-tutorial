@@ -33,19 +33,69 @@ DEBUG = env.bool("DJANGO_DEBUG", default=False)
 if DEBUG:
     logging.warning("Django DEBUG mode is ON. This should be turned off in production!")
 else:
-    # Production security headers
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # Production (non-TLS) security headers
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_SECURITY_POLICY = {
         "default-src": ("'self'",),
         "script-src": ("'self'", "cdn.jsdelivr.net"),
         "style-src": ("'self'", "cdn.jsdelivr.net"),
     }
+
+SERVER_TLS_CERT = env("SERVER_TLS_CERT", default="").strip()
+SERVER_TLS_KEY = env("SERVER_TLS_KEY", default="").strip()
+TLS_FILES_PROVIDED = bool(SERVER_TLS_CERT) and bool(SERVER_TLS_KEY)
+if (SERVER_TLS_CERT or SERVER_TLS_KEY) and not TLS_FILES_PROVIDED:
+    if DEBUG:
+        # Be more forgiving in development, but still warn the developer about the misconfiguration
+        logging.warning(
+            "SERVER_TLS_CERT or SERVER_TLS_KEY is set, but not both. TLS will be disabled. "
+            "In development, you can ignore this warning if you don't need TLS."
+        )
+    else:
+        # More strict in production to avoid accidentally running without TLS due to a misconfiguration
+        raise ValueError(
+            "Both SERVER_TLS_CERT and SERVER_TLS_KEY must be set to enable TLS. "
+            "If you want to disable TLS, leave both variables empty."
+        )
+if TLS_FILES_PROVIDED:
+    ssl_redirect_default = True
+    session_cookie_secure_default = True
+    csrf_cookie_secure_default = True
+    hsts_seconds_default = 31536000  # 1 year
+    hsts_include_subdomains_default = True
+    hsts_preload_default = True
+else:
+    ssl_redirect_default = False
+    session_cookie_secure_default = False
+    csrf_cookie_secure_default = False
+    hsts_seconds_default = 0
+    hsts_include_subdomains_default = False
+    hsts_preload_default = False
+
+SECURE_SSL_REDIRECT = env.bool(
+    "SECURE_SSL_REDIRECT",
+    default=ssl_redirect_default,
+)
+SESSION_COOKIE_SECURE = env.bool(
+    "SESSION_COOKIE_SECURE",
+    default=session_cookie_secure_default,
+)
+CSRF_COOKIE_SECURE = env.bool(
+    "CSRF_COOKIE_SECURE",
+    default=csrf_cookie_secure_default,
+)
+SECURE_HSTS_SECONDS = env.int(
+    "SECURE_HSTS_SECONDS",
+    default=hsts_seconds_default,
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=hsts_include_subdomains_default,
+)
+SECURE_HSTS_PRELOAD = env.bool(
+    "SECURE_HSTS_PRELOAD",
+    default=hsts_preload_default,
+)
 
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 if DEBUG is False and not ALLOWED_HOSTS:
