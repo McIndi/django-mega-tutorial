@@ -31,7 +31,6 @@ dev = [
     "bandit",
     "pre-commit",
     "coverage",
-    "psycopg2-binary",
     "celery",
     "redis",
     "flower",

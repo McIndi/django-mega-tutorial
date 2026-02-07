@@ -55,9 +55,6 @@ COPY --chown=appuser:appuser . .
 # Switch to non-root user
 USER appuser
 
-# Collect static files
-RUN /opt/venv/bin/python manage.py collectstatic --noinput
-
 # Expose port (default for Django)
 EXPOSE 8000
 

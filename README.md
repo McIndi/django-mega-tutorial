@@ -133,6 +133,9 @@ To run the application with Docker, PostgreSQL, Redis, and Celery:
 # Start all services (database + web + Redis + Celery worker + Flower)
 docker-compose up -d
 
+# Collect static assets
+docker-compose exec web python manage.py collectstatic --noinput
+
 # Run migrations
 docker-compose exec web python manage.py migrate
 
