@@ -133,6 +133,10 @@ To run the application with Docker, PostgreSQL, Redis, and Celery:
 # Start all services (database + web + Redis + Celery worker + Flower)
 docker-compose up -d
 
+# NOTE: This workflow runs the image without a bind mount for /app.
+# Code changes require a rebuild:
+# docker-compose build
+
 # Collect static assets
 docker-compose exec web python manage.py collectstatic --noinput
 
@@ -309,7 +313,25 @@ The test suite includes:
 python manage.py test_email your-email@example.com
 ```
 
-This command will send a welcome email to the specified address, helping you verify that your email backend is configured correctly.
+This command enqueues the Celery welcome email task for the specified address, helping you verify that your email backend is configured correctly.
+
+If you are running with Docker/Podman, watch the worker logs for console email output:
+
+```bash
+podman-compose logs -f celery_worker
+```
+
+If you do not see the email body, Celery may be redirecting stdout. A quick way to verify the console backend output is to run tasks eagerly:
+
+```bash
+CELERY_ALWAYS_EAGER=True python manage.py test_email your-email@example.com
+```
+
+You can also disable Celery stdout redirection so the console backend output appears in worker logs:
+
+```bash
+CELERY_WORKER_REDIRECT_STDOUTS=False
+```
 
 ## Code Quality
 

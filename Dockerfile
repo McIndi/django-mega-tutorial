@@ -52,6 +52,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Ensure writable staticfiles directory for collectstatic
+RUN mkdir -p /app/staticfiles && chown -R appuser:appuser /app/staticfiles
+
 # Switch to non-root user
 USER appuser
 

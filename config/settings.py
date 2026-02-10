@@ -406,6 +406,10 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_WORKER_REDIRECT_STDOUTS = env.bool(
+    "CELERY_WORKER_REDIRECT_STDOUTS",
+    default=False,
+)
 
 # In test environment, execute tasks synchronously and eagerly
 if "test" in sys.argv or env.bool("CELERY_ALWAYS_EAGER", default=False):
