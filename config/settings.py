@@ -421,12 +421,17 @@ CELERY_TASK_ROUTES = {
     "core.tasks.send_welcome_email": {"queue": "email"},
     "core.tasks.send_password_reset_email": {"queue": "email"},
     "core.tasks.cleanup_expired_tokens": {"queue": "celery"},
+    "links.tasks.record_link_click": {"queue": "clicks"},
 }
 
 CELERY_QUEUES = {
     "email": {
         "exchange": "email",
         "routing_key": "email",
+    },
+    "clicks": {
+        "exchange": "clicks",
+        "routing_key": "clicks",
     },
     "celery": {
         "exchange": "celery",

@@ -20,7 +20,8 @@ from django.views.generic import (
 
 
 from .forms import LinkForm
-from .models import Click, Link
+from .models import Link
+from .tasks import record_link_click
 
 logger = logging.getLogger(__name__)
 
@@ -159,19 +160,29 @@ class LinkPublicRedirectView(View):
         try:
             user = User.objects.get(username=username)
             link = Link.objects.get(user=user, slug=slug)
-        except (User.DoesNotExist, Link.DoesNotExist):
+        except User.DoesNotExist, Link.DoesNotExist:
             logger.warning(
                 f"Link not found: /{username}/{slug}/",
                 extra={"username": username, "slug": slug},
             )
             raise Http404()
 
-        Click.objects.create(
-            link=link,
-            referrer=request.META.get("HTTP_REFERER", ""),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
-            ip_address=self._get_client_ip(request),
-        )
+        referrer = request.META.get("HTTP_REFERER", "")
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+        ip_address = self._get_client_ip(request)
+
+        try:
+            record_link_click.delay(
+                link_id=link.id,
+                referrer=referrer,
+                user_agent=user_agent,
+                ip_address=ip_address,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to queue click record task",
+                extra={"link_id": link.id, "error": str(exc)},
+            )
 
         logger.info(
             f"Link redirect: {link.public_path} -> {link.target_url}",
@@ -179,7 +190,7 @@ class LinkPublicRedirectView(View):
                 "link_id": link.id,
                 "slug": slug,
                 "target": link.target_url,
-                "ip": self._get_client_ip(request),
+                "ip": ip_address,
             },
         )
 

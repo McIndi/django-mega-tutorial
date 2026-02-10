@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
@@ -74,6 +76,46 @@ class ClickModelTests(TestCase):
         self.assertEqual(click.referrer, "https://referrer.test")
         self.assertEqual(click.user_agent, "FakeBrowser/1.0")
         self.assertEqual(click.ip_address, "203.0.113.1")
+
+
+class ClickTaskTests(TestCase):
+    def setUp(self) -> None:
+        User = get_user_model()
+        self.alice = User.objects.create_user(
+            username="alice", email="alice@example.com", password="password123"
+        )
+        self.link = Link.objects.create(
+            user=self.alice, target_url="https://example.com"
+        )
+
+    def test_record_link_click_task_creates_click(self) -> None:
+        from .tasks import record_link_click
+
+        result = record_link_click.delay(
+            link_id=self.link.id,
+            referrer="https://referrer.test",
+            user_agent="TestBrowser/1.0",
+            ip_address="203.0.113.5",
+        )
+
+        self.assertTrue(result.successful())
+        click = Click.objects.get(link=self.link)
+        self.assertEqual(click.referrer, "https://referrer.test")
+        self.assertEqual(click.user_agent, "TestBrowser/1.0")
+        self.assertEqual(click.ip_address, "203.0.113.5")
+
+    def test_record_link_click_task_handles_missing_link(self) -> None:
+        from .tasks import record_link_click
+
+        result = record_link_click.delay(
+            link_id=99999,
+            referrer="",
+            user_agent="",
+            ip_address=None,
+        )
+
+        self.assertTrue(result.successful())
+        self.assertEqual(Click.objects.count(), 0)
 
 
 class LinkCRUDTests(TestCase):
@@ -167,6 +209,23 @@ class LinkPublicRedirectTests(TestCase):
         click = Click.objects.get(link=self.link)
         self.assertEqual(click.referrer, "https://social.example.com")
         self.assertEqual(click.user_agent, "TestBrowser/1.0")
+
+    @patch("links.views.record_link_click.delay")
+    def test_redirect_queues_click_task(self, mock_delay) -> None:
+        response = self.client.get(
+            reverse("link_redirect", args=[self.alice.username, self.link.slug]),
+            HTTP_REFERER="https://social.example.com",
+            HTTP_USER_AGENT="TestBrowser/1.0",
+            REMOTE_ADDR="203.0.113.9",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        mock_delay.assert_called_once_with(
+            link_id=self.link.id,
+            referrer="https://social.example.com",
+            user_agent="TestBrowser/1.0",
+            ip_address="203.0.113.9",
+        )
 
     def test_redirect_captures_ip_address(self) -> None:
         response = self.client.get(

@@ -47,13 +47,13 @@ class Command(BaseCommand):
             )
 
             if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
-                self.stdout.write(self.style.SUCCESS("Tasks run eagerly; waiting for result..."))
+                self.stdout.write(
+                    self.style.SUCCESS("Tasks run eagerly; waiting for result...")
+                )
                 result = task.get(timeout=30)
                 self.stdout.write(self.style.SUCCESS(f"Task result: {result}"))
             else:
-                self.stdout.write(
-                    "Check the celery worker logs for the email output."
-                )
+                self.stdout.write("Check the celery worker logs for the email output.")
 
         except Exception as e:
             self.stdout.write(

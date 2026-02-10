@@ -5,7 +5,6 @@ from django.conf import settings
 from django.core.validators import RegexValidator
 from django.db import models
 
-
 SLUG_ALPHABET = string.ascii_lowercase + string.digits
 SLUG_LENGTH = 10
 
