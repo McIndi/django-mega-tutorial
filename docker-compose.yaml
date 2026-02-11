@@ -88,7 +88,7 @@ services:
   # Celery worker service (email queue)
   celery_worker:
     image: django-mega-tutorial:local
-    command: celery -A config worker -Q email,celery -l info --concurrency=4
+    command: celery -A config worker -Q email,celery,clicks -l info --concurrency=4
     environment:
       # Django settings
       DEBUG: ${DJANGO_DEBUG:-False}
