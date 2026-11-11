@@ -1,3 +1,5 @@
+> Example / tutorial companion. Not maintained for production use.
+
 # Django SaaS Mega-Tutorial
 
 A production-minded Django SaaS starter template with email-based authentication, automated testing, and CI/CD pipeline.
